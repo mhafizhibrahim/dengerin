@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -54,6 +55,7 @@ import com.dengerin.app.core.util.formatDuration
 import com.dengerin.app.data.model.Song
 import com.dengerin.app.data.repository.LibraryRepository
 import com.dengerin.app.player.PlayerUiState
+import com.dengerin.app.presentation.ArtistItem
 import com.dengerin.app.presentation.HomeViewModel
 
 private enum class HomeFilter { SEMUA, MUSIK, PLAYLIST, RIWAYAT }
@@ -66,6 +68,7 @@ fun HomeScreen(
     onImportLink: () -> Unit,
     onOpenPlaylist: (String) -> Unit,
     onSongClick: (Song, List<Song>) -> Unit,
+    onArtistClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -314,6 +317,20 @@ fun HomeScreen(
             }
         }
 
+        if (state.artists.isNotEmpty()) {
+            item {
+                SectionTitle("Artis Untukmu")
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    state.artists.take(10).forEach { artist ->
+                        ArtistCard(artist = artist, onClick = { onArtistClick(artist.name) })
+                    }
+                }
+            }
+        }
+
         if (state.isLoadingCatalog) {
             item {
                 Text(
@@ -364,6 +381,46 @@ private fun SectionTitle(text: String) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(bottom = 8.dp),
     )
+}
+
+@Composable
+private fun ArtistCard(
+    artist: ArtistItem,
+    onClick: () -> Unit,
+) {
+    val colors = LocalDengerinColors.current
+    Column(
+        modifier = Modifier
+            .width(132.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        AsyncImage(
+            model = upgradeThumbnailUrl(artist.thumbnailUrl)
+                ?.takeIf { it.isNotBlank() }
+                ?: R.drawable.ic_music_placeholder,
+            contentDescription = "Foto artis ${artist.name}",
+            placeholder = painterResource(R.drawable.ic_music_placeholder),
+            error = painterResource(R.drawable.ic_music_placeholder),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(116.dp)
+                .clip(CircleShape)
+                .border(1.dp, colors.border, CircleShape),
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = artist.name,
+            color = colors.textPrimary,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable

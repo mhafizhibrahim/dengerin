@@ -5,6 +5,7 @@ import com.dengerin.app.data.db.DengerinDatabase
 import com.dengerin.app.data.extractor.MusicExtractorRepository
 import com.dengerin.app.data.lyrics.LyricsRepository
 import com.dengerin.app.data.preferences.ThemePreferences
+import com.dengerin.app.data.recent.RecentSearchStore
 import com.dengerin.app.data.recent.RecentlyPlayedStore
 import com.dengerin.app.data.repository.LibraryRepository
 import com.dengerin.app.data.resolver.SongResolver
@@ -18,6 +19,7 @@ class AppContainer(context: Context) {
     val themePreferences = ThemePreferences(appContext)
     val musicExtractorRepository = MusicExtractorRepository()
     val recentlyPlayedStore = RecentlyPlayedStore()
+    val recentSearchStore = RecentSearchStore(appContext)
 
     private val db = DengerinDatabase.build(appContext)
     private val dao = db.dao()

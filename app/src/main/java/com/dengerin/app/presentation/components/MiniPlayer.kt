@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +36,7 @@ import coil.compose.AsyncImage
 import com.dengerin.app.R
 import com.dengerin.app.core.theme.LocalDengerinColors
 import com.dengerin.app.core.upgradeThumbnailUrl
+import com.dengerin.app.data.model.Song
 import com.dengerin.app.player.PlayerController
 import com.dengerin.app.player.PlayerUiState
 
@@ -43,6 +45,7 @@ fun MiniPlayer(
     state: PlayerUiState,
     controller: PlayerController,
     onOpen: () -> Unit,
+    onAddToPlaylist: (Song) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val song = state.song ?: return
@@ -95,7 +98,18 @@ fun MiniPlayer(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(2.dp))
+                IconButton(
+                    onClick = { onAddToPlaylist(song) },
+                    modifier = Modifier.size(34.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = "Tambah lagu ini ke playlist",
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
                 if (state.isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier

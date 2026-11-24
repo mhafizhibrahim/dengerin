@@ -28,6 +28,7 @@ akun Spotify.
 - [✨ Fitur](#-fitur)
 - [📥 Unduh & pasang](#-unduh--pasang)
 - [🔄 Pembaruan otomatis](#-pembaruan-otomatis)
+- [📝 Catatan rilis](#-catatan-rilis)
 - [🛠 Build dari sumber](#-build-dari-sumber)
 - [🧩 Arsitektur singkat](#-arsitektur-singkat)
 - [❓ Troubleshooting](#-troubleshooting)
@@ -50,12 +51,16 @@ Ganti tema langsung berubah, tanpa animasi atau layer penutup layar.
 
 | Fitur | Apa yang kamu dapat |
 | --- | --- |
-| 🔎 **Cari lagu** | Cari lagu atau artis, lalu langsung putar dari hasil pencarian. |
+| 🔎 **Cari & jelajah** | Cari lagu/artis, riwayat 5 kata kunci, 8 kategori musik, dan rak hashtag—semuanya langsung mencari lagu nyata. |
+| ➕ **Tambah ke playlist** | Dari hasil cari, detail playlist, Now Playing, atau mini player: buat playlist baru, simpan ke *Lagu Disukai*, atau kelola playlist lokal tanpa duplikat. |
+| 🎲 **True shuffle** | Acak seluruh antrean tanpa memotong lagu yang sedang berjalan; next/previous dan auto-advance mengikuti urutan acak. |
+| 🧑‍🎤 **Artis populer** | Rak avatar bulat di Beranda dari riwayat & playlist kamu, dilengkapi artis favorit; ketuk untuk langsung cari lagunya. |
 | ▶️ **Kontrol penuh** | Play/pause, next/previous, shuffle, repeat, dan slider *seek* yang bisa digeser. |
 | 🫧 **Mini player** | Melayang di atas navigasi, tetap terlihat saat kamu jelajah aplikasi. |
 | 💿 **Sedang Diputar** | Sampul besar, progres, tombol suka, shuffle, dan repeat dalam satu layar. |
 | 📝 **Live Lyrics** | Kartu lirik sinkron di bawah kontrol, bisa diperbesar ke layar penuh, lengkap dengan penyesuaian timing `±0.5s`. |
 | 💚 **Koleksi** | Lagu disukai, riwayat putar, playlist lokal, dan playlist baru dengan satu tombol. |
+| 📀 **Detail playlist** | Gradien sampul, cari & sortir di playlist, total durasi, tombol putar bundar, dan indikator shuffle. |
 | 🔗 **Impor Spotify** | Tempel link playlist publik—tanpa login, tanpa izin khusus. |
 | 🌗 **Tema instan** | Pilih **Sistem / Gelap / Terang** dari tab Koleksi; langsung berubah seketika. |
 | 🔄 **Auto-update** | Cek rilis baru dari GitHub saat aplikasi dibuka, plus tombol **Cek Pembaruan** manual. |
@@ -65,7 +70,7 @@ Ganti tema langsung berubah, tanpa animasi atau layer penutup layar.
 ## 📥 Unduh & pasang
 
 1. Buka halaman [GitHub Releases](https://github.com/mhafizhibrahim/dengerin/releases/latest).
-2. Unduh **`Dengerin-v1.0.0.apk`** (atau versi terbaru yang tersedia).
+2. Unduh **`Dengerin-v1.1.0.apk`** (atau versi terbaru yang tersedia).
 3. Buka file APK di HP dan pilih **Instal**.
 4. Minimal Android **8.0 (API 26)**.
 
@@ -102,6 +107,21 @@ Saat pembaruan pertama, Android akan meminta izin **Instal aplikasi yang tidak d
 Dengerin. Setelah diizinkan, APK hasil unduhan dibuka lewat installer sistem. **Kamu tetap harus
 menekan konfirmasi pasang**—tidak ada instalasi diam-diam. Tidak perlu izin penyimpanan karena
 APK hanya disimpan di cache aplikasi sendiri.
+
+## 📝 Catatan rilis
+
+### v1.1.0
+
+- Layar **Cari** tidak lagi bertabrakan dengan status bar; search bar 52dp dengan border hijau saat fokus.
+- Mode jelajah: riwayat penarian, 8 kategori musik, dan rak hashtag yang langsung mencari lagu.
+- Bottom sheet **Tambah ke playlist** tersedia di hasil cari, detail playlist, Now Playing, dan mini player.
+- Detail playlist bergaya Spotify: gradien sampul, cari & sortir, total durasi, play bundar, dan shuffle dengan indikator.
+- True shuffle: unduhan acak Fisher-Yates langsung diputar, sisa antrean diacak tanpa memotong lagu aktif.
+- Rak **Artis Untukmu** dengan avatar bulat; ketuk untuk membuka hasil pencarian artis tersebut.
+
+### v1.0.0
+
+- Rilis awal: pemutar latar belakang, lirik sinkron, koleksi lokal, impor playlist Spotify, dan auto-updater GitHub Releases.
 
 ## 🛠 Build dari sumber
 
@@ -166,4 +186,4 @@ R8/minify sengaja dimatikan, mengikuti konfigurasi proyek Sisihin yang sudah sta
 
 ---
 
-Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.0.0**.
+Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.1.0**.

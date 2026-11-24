@@ -24,6 +24,10 @@ interface DengerinDao {
     @Query("SELECT * FROM playlist_tracks WHERE playlistId = :playlistId ORDER BY position ASC")
     fun observeTracks(playlistId: String): Flow<List<PlaylistTrackEntity>>
 
+    /** Semua isi playlist (termasuk hasil impor) dipakai HomeScreen untuk rak artis. */
+    @Query("SELECT * FROM playlist_tracks ORDER BY playlistId ASC, position ASC")
+    fun observeAllPlaylistTracks(): Flow<List<PlaylistTrackEntity>>
+
     @Query("UPDATE play_history SET playedAt = :playedAt, playCount = playCount + 1, title = :title, artist = :artist, thumbnailUrl = :thumbnailUrl, durationSeconds = :durationSeconds, spotifyId = :spotifyId WHERE videoUrl = :videoUrl")
     suspend fun bumpHistory(
         videoUrl: String,
@@ -64,6 +68,43 @@ interface DengerinDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTracks(tracks: List<PlaylistTrackEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrack(track: PlaylistTrackEntity)
+
+    @Query("SELECT COUNT(*) FROM playlist_tracks WHERE playlistId = :playlistId")
+    suspend fun playlistTrackCount(playlistId: String): Int
+
+    /**
+     * Satu lagu dianggap sama kalau spotifyId atau videoUrl cocok. NULLIF mencegah
+     * dua lagu lokal tanpa spotifyId tersamakan hanya karena sama-sama kosong.
+     */
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM playlist_tracks
+            WHERE playlistId = :playlistId AND (
+                (NULLIF(:spotifyId, '') IS NOT NULL AND spotifyId = :spotifyId) OR
+                (NULLIF(:videoUrl, '') IS NOT NULL AND videoUrl = :videoUrl)
+            )
+        )
+        """,
+    )
+    suspend fun playlistContainsSong(playlistId: String, spotifyId: String, videoUrl: String): Boolean
+
+    @Query(
+        """
+        DELETE FROM playlist_tracks
+        WHERE playlistId = :playlistId AND (
+            (NULLIF(:spotifyId, '') IS NOT NULL AND spotifyId = :spotifyId) OR
+            (NULLIF(:videoUrl, '') IS NOT NULL AND videoUrl = :videoUrl)
+        )
+        """,
+    )
+    suspend fun removePlaylistSong(playlistId: String, spotifyId: String, videoUrl: String)
+
+    @Query("UPDATE playlists SET updatedAt = :updatedAt WHERE id = :playlistId")
+    suspend fun touchPlaylist(playlistId: String, updatedAt: Long)
 
     @Query("SELECT * FROM playlist_tracks WHERE playlistId = :playlistId ORDER BY position ASC")
     suspend fun tracksSnapshot(playlistId: String): List<PlaylistTrackEntity>

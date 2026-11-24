@@ -9,4 +9,5 @@ data class SearchUiState(
     val error: String? = null,
     val hasSearched: Boolean = false,
     val lastQuery: String = "",
+    val recentQueries: List<String> = emptyList(),
 )

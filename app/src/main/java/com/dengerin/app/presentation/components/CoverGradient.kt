@@ -45,6 +45,25 @@ fun rememberCoverGradient(imageUrl: String): State<Brush> {
 }
 
 /**
+ * Versi sedikit lebih berwarna untuk Detail Playlist: tetap diredupkan dan ditutup
+ * dengan `#151B22` → `#0C1014` sesuai kontrak warna dinamis Dengerin.
+ */
+@Composable
+fun rememberPlaylistCoverGradient(imageUrl: String): State<Brush> {
+    val colors = LocalDengerinColors.current
+    val dominantRgb by rememberDominantRgb(imageUrl)
+
+    return remember(dominantRgb, colors) {
+        derivedStateOf {
+            val top = dominantRgb
+                ?.let { blend(colors.surfaceElevated, Color(it), 0.58f) }
+                ?: colors.surface
+            Brush.verticalGradient(listOf(top, colors.surface, colors.background))
+        }
+    }
+}
+
+/**
  * Warna dominan sampul yang sudah di-tuning untuk lirik: saturasi tetap hidup, tapi
  * luminance ditekan sampai teks putih punya kontras minimal 4.5:1.
  */

@@ -119,11 +119,33 @@ class PlayerController(
         }
     }
 
-    fun playSong(song: Song, queue: List<Song> = listOf(song)) {
-        val safeQueue = queue.ifEmpty { listOf(song) }
+    /**
+     * Putar satu lagu dari antrean. Saat Shuffle aktif, lagu yang dipilih tetap
+     * diputar sekarang dan sisa antrean diacak (tidak memotong lagu berjalan).
+     */
+    fun playSong(song: Song, queue: List<Song> = listOf(song), randomStart: Boolean = false) {
+        val safeQueue = queue.ifEmpty { listOf(song) }.distinctSongs()
         originalQueue = safeQueue
-        val actualQueue = if (mutableState.value.isShuffle) shuffleKeeping(song, safeQueue) else safeQueue
-        playInternal(song, actualQueue)
+        val shuffle = mutableState.value.isShuffle
+        val actualQueue = when {
+            !shuffle -> safeQueue
+            randomStart -> safeQueue.shuffled()
+            else -> shuffleKeeping(song, safeQueue)
+        }
+        val first = if (shuffle && randomStart) actualQueue.firstOrNull() ?: song else song
+        playInternal(first, actualQueue)
+    }
+
+    /**
+     * Dipakai tombol putar playlist: kalau Shuffle aktif, seluruh antrean diacak
+     * dan lagu pertama dari hasil acakan yang langsung diputar.
+     */
+    fun playQueue(queue: List<Song>, shuffleStart: Boolean = false) {
+        val safeQueue = queue.distinctSongs()
+        if (safeQueue.isEmpty()) return
+        val randomStart = shuffleStart && mutableState.value.isShuffle
+        val first = if (randomStart) safeQueue.random() else safeQueue.first()
+        playSong(first, safeQueue, randomStart = randomStart)
     }
 
     private fun playInternal(song: Song, queue: List<Song>) {
@@ -271,8 +293,10 @@ class PlayerController(
         val next = !mutableState.value.isShuffle
         val current = mutableState.value.song
         mutableState.update { state ->
-            val queue = if (next) shuffleKeeping(current, originalQueue.ifEmpty { state.queue })
-            else originalQueue.ifEmpty { state.queue }
+            val base = originalQueue.ifEmpty { state.queue }
+            // Menyalakan: lagu saat ini tetap berjalan, sisa antrean diacak.
+            // Mematikan: urutan asli dipulihkan, lagu saat ini tidak diganti.
+            val queue = if (next) shuffleKeeping(current, base) else base
             state.copy(isShuffle = next, queue = queue)
         }
     }
@@ -295,6 +319,9 @@ class PlayerController(
         mediaController = null
         connectionFuture = null
     }
+
+    private fun List<Song>.distinctSongs(): List<Song> =
+        distinctBy { it.spotifyId.ifBlank { it.id } }
 
     private fun shuffleKeeping(current: Song?, queue: List<Song>): List<Song> {
         if (queue.isEmpty()) return queue

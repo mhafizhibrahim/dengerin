@@ -14,4 +14,13 @@ fun formatDuration(durationMs: Long): String {
     }
 }
 
+/** Ringkasan total durasi playlist: `1 j 49 mnt` atau `49 mnt`. */
+fun formatTotalDuration(durationMs: Long): String {
+    if (durationMs <= 0) return "0 mnt"
+    val totalMinutes = durationMs / 60_000L
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return if (hours > 0) "$hours j $minutes mnt" else "$minutes mnt"
+}
+
 private fun Long.pad(): String = toString().padStart(2, '0')

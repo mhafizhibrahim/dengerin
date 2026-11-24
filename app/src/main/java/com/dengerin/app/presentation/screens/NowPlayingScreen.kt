@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -64,6 +65,7 @@ import com.dengerin.app.R
 import com.dengerin.app.core.theme.LocalDengerinColors
 import com.dengerin.app.core.upgradeThumbnailUrl
 import com.dengerin.app.core.util.formatDuration
+import com.dengerin.app.data.model.Song
 import com.dengerin.app.player.PlayerController
 import com.dengerin.app.player.PlayerUiState
 import com.dengerin.app.presentation.LyricsViewModel
@@ -78,6 +80,7 @@ fun NowPlayingScreen(
     controller: PlayerController,
     lyricsViewModel: LyricsViewModel,
     onOpenLyrics: () -> Unit,
+    onAddToPlaylist: (Song) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -221,6 +224,13 @@ fun NowPlayingScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(onClick = { song?.let(onAddToPlaylist) }) {
+                    Icon(
+                        Icons.Filled.PlaylistAdd,
+                        contentDescription = "Tambah lagu ke playlist",
+                        tint = colors.textSecondary,
+                    )
+                }
                 IconButton(onClick = controller::toggleShuffle) {
                     Icon(
                         Icons.Filled.Shuffle,

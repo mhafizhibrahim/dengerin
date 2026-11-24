@@ -11,8 +11,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +38,7 @@ fun SongRow(
     song: Song,
     isActive: Boolean,
     onClick: () -> Unit,
+    onAddToPlaylist: ((Song) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalDengerinColors.current
@@ -78,8 +83,22 @@ fun SongRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (onAddToPlaylist != null) {
+            Spacer(Modifier.width(2.dp))
+            IconButton(
+                onClick = { onAddToPlaylist(song) },
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "Tambah ${song.title} ke playlist",
+                    tint = colors.textSecondary,
+                    modifier = Modifier.size(19.dp),
+                )
+            }
+        }
         if (isActive) {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
             Spacer(
                 Modifier
                     .size(8.dp)
