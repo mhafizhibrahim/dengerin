@@ -1,53 +1,169 @@
-# Dengerin
+<div align="center">
 
-[![Versi rilis](https://img.shields.io/github/v/release/mhafizhibrahim/dengerin)](https://github.com/mhafizhibrahim/dengerin/releases/latest)
+# 🎧 Dengerin
 
-Pemutar musik Android dengan rasa yang akrab, tapi tanpa sampah UI: gelap by default,
-mini player melayang, dan tanpa banner promosi. Lagu dicari dan diputar langsung dari
-sumber publik—tanpa perlu akun Spotify.
+**Dengerin musikmu, tanpa drama.**
 
-## Fitur
+Pemutar musik Android yang akrab dipakai, tapi bersih: gelap by default, mini player
+melayang, dan nol sampah UI. Cari lagu, simpan playlist, baca lirik langsung—tanpa perlu
+akun Spotify.
 
-- Putar lagu dari hasil pencarian, dengan kontrol *play/pause*, *next/previous*, *shuffle*,
-  *repeat*, dan slider *seek*.
-- Mini player melayang di atas navigasi; layar **Sedang Diputar** dengan sampul, progres,
-  suka, dan mode putar.
-- **Live Lyrics**: kartu lirik sinkron di layar putar, bisa diperbesar ke layar penuh,
-  lengkap dengan penyesuaian timing `±0.5s`.
-- **Koleksi**: lagu disukai, riwayat putar, playlist lokal, dan impor playlist Spotify publik
-  lewat link—tanpa login.
-- Tampilan instan: pilih **Sistem / Gelap / Terang** dari tab Koleksi.
-- Pengecek pembaruan otomatis dari GitHub Releases, dengan unduh APK langsung dan
-  progres di dialog. Versi terpasang dan tombol **Cek Pembaruan** ada di tab **Koleksi**.
+[📥 Unduh APK](https://github.com/mhafizhibrahim/dengerin/releases/latest) ·
+[📦 Semua rilis](https://github.com/mhafizhibrahim/dengerin/releases) ·
+[⭐ Star repo](https://github.com/mhafizhibrahim/dengerin)
 
-## Unduh
+[![Rilis terbaru](https://img.shields.io/github/v/release/mhafizhibrahim/dengerin?style=for-the-badge&color=1ED760)](https://github.com/mhafizhibrahim/dengerin/releases/latest)
+[![Total unduhan](https://img.shields.io/github/downloads/mhafizhibrahim/dengerin/total?style=for-the-badge&color=1ED760)](https://github.com/mhafizhibrahim/dengerin/releases)
+[![Bintang](https://img.shields.io/github/stars/mhafizhibrahim/dengerin?style=for-the-badge&color=1ED760)](https://github.com/mhafizhibrahim/dengerin/stargazers)
+![Android](https://img.shields.io/badge/Android-8.0%2B-1ED760?style=for-the-badge)
+![Stack](https://img.shields.io/badge/Kotlin%20%2B%20Jetpack%20Compose-1ED760?style=for-the-badge)
 
-Ambil APK terbaru dari halaman [GitHub Releases](https://github.com/mhafizhibrahim/dengerin/releases/latest).
-Minimal Android 8.0 (API 26).
+</div>
 
-Saat membuka APK pertama kali, Android atau Google Play Protect bisa menampilkan peringatan.
-Pilih **Detail selengkapnya** → **Tetap instal** untuk melanjutkan. Ini wajar karena aplikasi
-didistribusikan langsung sebagai APK, bukan lewat Play Store.
+---
 
-Untuk pembaruan dalam aplikasi, Dengerin meminta izin **Instal aplikasi yang tidak dikenal**
-sekali pada Android 8+. Setelah diizinkan, APK unduhan dari GitHub akan dibuka lewat installer
-sistem; konfirmasi pasang tetap dilakukan oleh kamu.
+## Daftar isi
 
-## Soal pembaruan
+- [Kenapa Dengerin?](#kenapa-dengerin)
+- [✨ Fitur](#-fitur)
+- [📥 Unduh & pasang](#-unduh--pasang)
+- [🔄 Pembaruan otomatis](#-pembaruan-otomatis)
+- [🛠 Build dari sumber](#-build-dari-sumber)
+- [🧩 Arsitektur singkat](#-arsitektur-singkat)
+- [❓ Troubleshooting](#-troubleshooting)
+- [🔗 Tautan](#-tautan)
 
-Aplikasi mengecek rilis terbaru sekali saat dibuka, di background. Kalau sedang offline, sudah
-versi terbaru, atau GitHub sedang bermasalah, tidak ada dialog apa pun. Versi dibandingkan per
-segmen angka, jadi `1.0.10` dianggap lebih baru dari `1.0.2`.
+## Kenapa Dengerin?
 
-Cek manual bisa lewat **Koleksi → Cek Pembaruan**. Dialog menampilkan nomor versi, catatan
-rilis, progres unduh, lalu tombol **Perbarui** dan **Nanti**.
+Dengerin meminjam **struktur** yang sudah terasa akrab—header sapaan, pintasan, rak horizontal,
+mini player—tapi dengan identitas sendiri:
 
-## Build dari sumber
+- **Instagram Dark Slate** `#0C1014`, bukan hitam pekat atau abu kusam.
+- Kartu datar dengan border halus `1dp #27313D`, tanpa elevation/glow berlebihan.
+- Aksen hijau segar `#1ED760`, dipakai untuk status aktif dan tombol utama.
+- Mini player berupa *floating pill* dengan jarak `8dp` dari tepi.
+- **Nol sampah UI**: tanpa banner Premium, pop-up promosi, tab podcast/audiobook, atau iklan.
+
+Ganti tema langsung berubah, tanpa animasi atau layer penutup layar.
+
+## ✨ Fitur
+
+| Fitur | Apa yang kamu dapat |
+| --- | --- |
+| 🔎 **Cari lagu** | Cari lagu atau artis, lalu langsung putar dari hasil pencarian. |
+| ▶️ **Kontrol penuh** | Play/pause, next/previous, shuffle, repeat, dan slider *seek* yang bisa digeser. |
+| 🫧 **Mini player** | Melayang di atas navigasi, tetap terlihat saat kamu jelajah aplikasi. |
+| 💿 **Sedang Diputar** | Sampul besar, progres, tombol suka, shuffle, dan repeat dalam satu layar. |
+| 📝 **Live Lyrics** | Kartu lirik sinkron di bawah kontrol, bisa diperbesar ke layar penuh, lengkap dengan penyesuaian timing `±0.5s`. |
+| 💚 **Koleksi** | Lagu disukai, riwayat putar, playlist lokal, dan playlist baru dengan satu tombol. |
+| 🔗 **Impor Spotify** | Tempel link playlist publik—tanpa login, tanpa izin khusus. |
+| 🌗 **Tema instan** | Pilih **Sistem / Gelap / Terang** dari tab Koleksi; langsung berubah seketika. |
+| 🔄 **Auto-update** | Cek rilis baru dari GitHub saat aplikasi dibuka, plus tombol **Cek Pembaruan** manual. |
+
+> Catatan: lirik diambil dari layanan lirik publik (Lrclib). Ketersediaan lirik tergantung lagu.
+
+## 📥 Unduh & pasang
+
+1. Buka halaman [GitHub Releases](https://github.com/mhafizhibrahim/dengerin/releases/latest).
+2. Unduh **`Dengerin-v1.0.0.apk`** (atau versi terbaru yang tersedia).
+3. Buka file APK di HP dan pilih **Instal**.
+4. Minimal Android **8.0 (API 26)**.
+
+### Soal Play Protect
+
+Karena Dengerin didistribusikan langsung sebagai APK—bukan lewat Play Store—Google Play Protect
+bisa menampilkan peringatan. Ini wajar. Pilih:
+
+**Detail selengkapnya → Tetap instal → Instal anyway**
+
+APK yang dirilis sudah ditandatangani dengan kunci release sendiri dan bisa diverifikasi dengan
+`apksigner verify`.
+
+## 🔄 Pembaruan otomatis
+
+Dengerin mengecek rilis terbaru lewat **GitHub Releases API**, sekali saat aplikasi dibuka, di
+background.
+
+- Kalau **sudah versi terbaru**, **sedang offline**, atau GitHub bermasalah → **tidak ada dialog**.
+- Kalau ada versi baru → muncul dialog berisi nomor versi, catatan rilis, progres unduh, tombol
+  **Perbarui** dan **Nanti**.
+- Versi dibandingkan per segmen angka, jadi `1.0.10` dianggap lebih baru dari `1.0.2`.
+- Cek manual ada di **Koleksi → Cek Pembaruan**, lengkap dengan versi yang sedang terpasang.
+
+### Izin instal
+
+Untuk pemasangan langsung, Dengerin mendaftarkan:
+
+- `android.permission.REQUEST_INSTALL_PACKAGES`
+- `FileProvider` dengan authority `com.dengerin.app.provider`, yang hanya membagikan folder
+  `cacheDir/updates/`
+
+Saat pembaruan pertama, Android akan meminta izin **Instal aplikasi yang tidak dikenal** untuk
+Dengerin. Setelah diizinkan, APK hasil unduhan dibuka lewat installer sistem. **Kamu tetap harus
+menekan konfirmasi pasang**—tidak ada instalasi diam-diam. Tidak perlu izin penyimpanan karena
+APK hanya disimpan di cache aplikasi sendiri.
+
+## 🛠 Build dari sumber
+
+Butuh JDK 17, Android SDK 35, dan Gradle wrapper yang sudah disertakan.
 
 ```bash
+# Windows
+.\gradlew.bat assembleRelease
+
+# macOS / Linux
 ./gradlew assembleRelease
 ```
 
-Kredensial signing dibaca dari `keystore.properties` di root (tidak ikut di-commit).
-Konfigurasi r8/minify mengikuti pola proyek Sisihin: dimatikan supaya NewPipeExtractor,
-Media3, Room, dan OkHttp tidak ter-strip saat runtime.
+Hasil: `app/build/outputs/apk/release/app-release.apk`.
+
+Kredensial signing sengaja **tidak** disimpan di repo. Untuk build release dari clone baru:
+
+1. Buat keystore:
+   ```bash
+   keytool -genkeypair -v -keystore app/dengerin-release.jks -alias dengerin \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+2. Buat `keystore.properties` di root:
+   ```properties
+   storePassword=password_keystore_kamu
+   keyPassword=password_key_kamu
+   ```
+3. Pastikan `keystore.properties`, `*.jks`, `*.keystore`, dan `local.properties` tidak pernah
+   di-`commit` (sudah diabaikan oleh `.gitignore`).
+
+R8/minify sengaja dimatikan, mengikuti konfigurasi proyek Sisihin yang sudah stabil, supaya
+`NewPipeExtractor`, `Media3`, `Room`, dan `OkHttp` tidak ter-strip saat runtime.
+
+## 🧩 Arsitektur singkat
+
+- **UI**: Jetpack Compose + Material 3, satu `DengerinTheme` dengan token warna tetap di
+  `core/theme/Color.kt`.
+- **Navigasi**: `NavHost` dengan rute datar; tiga tab utama (`Beranda`, `Cari`, `Koleksi`)
+  memakai state index, bukan rute terpisah.
+- **DI**: `AppContainer` manual—tanpa Hilt—supaya build tetap ringan.
+- **Pemutar**: Media3 ExoPlayer + `MusicPlaybackService` untuk pemutaran latar belakang.
+- **Sumber lagu**: NewPipeExtractor dengan downloader OkHttp khusus.
+- **Data lokal**: Room untuk lagu disukai, riwayat, dan playlist; DataStore untuk preferensi tema.
+- **Updater**: `UpdateChecker` + `ApkDownloader`, keduanya memakai API bawaan Android sehingga
+  tidak menambah dependency baru.
+
+## ❓ Troubleshooting
+
+| Masalah | Solusi |
+| --- | --- |
+| Play Protect bilang aplikasi berbahaya | Pilih **Detail selengkapnya → Tetap instal**. Pakai hanya APK dari halaman rilis resmi ini. |
+| Install update ditolak *update incompatible* | Ada Dengerin versi lain dengan tanda tangan berbeda. Uninstall yang lama lalu pasang ulang (data lama bisa hilang). |
+| *Cek Pembaruan* gagal | Cek koneksi internet. Cek otomatis sengaja diam bila GitHub tidak bisa dijangkau. |
+| Tidak ada suara / playback berhenti | Izinkan notifikasi saat diminta agar layanan pemutaran latar belakang tetap jalan. |
+| Lirik tidak muncul | Tidak semua lagu punya lirik di Lrclib. Coba lagu lain atau sesuaikan timing di layar lirik penuh. |
+
+## 🔗 Tautan
+
+- 📦 [GitHub Releases — unduh APK](https://github.com/mhafizhibrahim/dengerin/releases/latest)
+- 🐛 [Lapor masalah](https://github.com/mhafizhibrahim/dengerin/issues)
+- 💻 [Source code](https://github.com/mhafizhibrahim/dengerin)
+
+---
+
+Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.0.0**.
