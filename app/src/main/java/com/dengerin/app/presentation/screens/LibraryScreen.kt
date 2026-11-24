@@ -109,6 +109,12 @@ fun LibraryScreen(
         }
     }
 
+    // Dialog tetap terbuka sampai sampul 10 lagu pertama siap, lalu ditutup
+    // otomatis bersamaan dengan perpindahan ke detail playlist.
+    LaunchedEffect(action.importedPlaylistId, action.error) {
+        if (action.importedPlaylistId != null || action.error != null) showImportDialog = false
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = colors.background,
@@ -372,7 +378,7 @@ fun LibraryScreen(
 
     if (showImportDialog) {
         AlertDialog(
-            onDismissRequest = { showImportDialog = false },
+            onDismissRequest = { if (!action.isBusy) showImportDialog = false },
             title = { Text("Impor Link Playlist", color = colors.textPrimary) },
             text = {
                 Column {
@@ -395,10 +401,19 @@ fun LibraryScreen(
                             unfocusedBorderColor = colors.border,
                         ),
                     )
+                    if (action.isBusy) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = action.progress ?: "Menyiapkan playlist…",
+                            color = colors.accentSoftContent,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
+                    enabled = !action.isBusy,
                     onClick = {
                         clipboard.getText()?.let { linkInput = it.text }
                     },
@@ -406,15 +421,17 @@ fun LibraryScreen(
             },
             dismissButton = {
                 Row {
-                    TextButton(onClick = { showImportDialog = false }) {
+                    TextButton(
+                        enabled = !action.isBusy,
+                        onClick = { showImportDialog = false },
+                    ) {
                         Text("Batal", color = colors.textSecondary)
                     }
                     TextButton(
-                        enabled = linkInput.isNotBlank(),
+                        enabled = linkInput.isNotBlank() && !action.isBusy,
                         onClick = {
                             viewModel.importLink(linkInput.trim())
                             linkInput = ""
-                            showImportDialog = false
                         },
                     ) { Text("Impor", color = colors.accent) }
                 }

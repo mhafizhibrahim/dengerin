@@ -7,6 +7,7 @@ import com.dengerin.app.data.db.DengerinDao
 import com.dengerin.app.data.db.SpotifyMatchCacheEntity
 import com.dengerin.app.data.extractor.MusicExtractorRepository
 import com.dengerin.app.data.model.Song
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -39,9 +40,13 @@ class SongResolver(
                 return@runCatching resolved
             }
 
-            val candidates = extractor
-                .searchSongs("${song.title} ${song.artist}")
-                .getOrElse { throw IllegalStateException("Gagal mencari lagu di YouTube: ${it.message}") }
+            val candidates = try {
+                extractor.searchSongs("${song.title} ${song.artist}").getOrThrow()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                throw IllegalStateException("Gagal mencari lagu di YouTube: ${error.message}", error)
+            }
             if (candidates.isEmpty()) throw IllegalStateException("Lagu ini belum ketemu di YouTube.")
 
             val best = candidates.maxByOrNull { candidate ->
@@ -65,8 +70,8 @@ class SongResolver(
 
     /**
      * Dipakai saat impor: semua lagu dicocokkan sekaligus dengan konkurensi
-     * terbatas. Satu lagu gagal tidak membatalkan impor; ia tetap memakai cover
-     * playlist sebagai fallback. Progres dikirim per lagu yang selesai.
+     * terbatas. Satu lagu gagal tidak membatalkan impor; lagu itu dibiarkan
+     * tanpa thumbnail sampai dicoba lagi. Progres dikirim per lagu yang selesai.
      */
     suspend fun resolveAll(
         songs: List<Song>,
@@ -80,7 +85,13 @@ class SongResolver(
                 songs.map { song ->
                     async(Dispatchers.IO) {
                         permits.withPermit {
-                            val resolved: Song = runCatching { resolve(song).getOrThrow() }.getOrDefault(song)
+                            val resolved: Song = try {
+                                resolve(song).getOrThrow()
+                            } catch (error: CancellationException) {
+                                throw error
+                            } catch (error: Throwable) {
+                                song
+                            }
                             onProgress?.invoke(finished.incrementAndGet(), songs.size)
                             resolved
                         }

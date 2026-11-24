@@ -70,7 +70,7 @@ Ganti tema langsung berubah, tanpa animasi atau layer penutup layar.
 ## 📥 Unduh & pasang
 
 1. Buka halaman [GitHub Releases](https://github.com/mhafizhibrahim/dengerin/releases/latest).
-2. Unduh **`Dengerin-v1.1.0.apk`** (atau versi terbaru yang tersedia).
+2. Unduh **`Dengerin-v1.1.1.apk`** (atau versi terbaru yang tersedia).
 3. Buka file APK di HP dan pilih **Instal**.
 4. Minimal Android **8.0 (API 26)**.
 
@@ -121,6 +121,12 @@ Setiap rilis baru dilakukan berurutan supaya updater dan dokumen tetap sinkron:
 4. Build `assembleRelease`, lalu unggah APK dengan nama `Dengerin-vX.Y.Z.apk` ke GitHub Release.
 5. Pastikan `gh api repos/mhafizhibrahim/dengerin/releases/latest --jq .tag_name`
    mengembalikan tag rilis tersebut.
+
+### v1.1.1
+
+- **Fix bugs**: scroll cepat di playlist 100 lagu tidak lagi *force close*. Key `LazyColumn` sekarang unik per indeks dan thumbnail didekode maksimal 144 px tanpa crossfade.
+- **Fix bugs**: auto-next saat Shuffle aktif kini benar-benar berputar. Antrean (`originalQueue` / `activeQueue` / `currentIndex`) dikelola penuh di `PlayerController`, termasuk `REPEAT_ONE`, wrap `REPEAT_ALL`, dan skip 3 kali bila ekstraksi gagal.
+- **Fix bugs**: thumbnail YouTube HD langsung tampil sejak impor. 10 lagu pertama disiapkan lebih dulu dengan progres di dialog, sisanya menyusul di worker latar belakang; cover playlist tidak lagi dipinjam sebagai sampul trek.
 
 ### v1.1.0
 
@@ -198,4 +204,4 @@ R8/minify sengaja dimatikan, mengikuti konfigurasi proyek Sisihin yang sudah sta
 
 ---
 
-Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.1.0**.
+Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.1.1**.

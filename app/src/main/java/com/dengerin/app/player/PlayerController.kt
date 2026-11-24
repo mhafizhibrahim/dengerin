@@ -2,6 +2,7 @@ package com.dengerin.app.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
@@ -14,7 +15,9 @@ import com.dengerin.app.data.extractor.MusicExtractorRepository
 import com.dengerin.app.data.model.Song
 import com.dengerin.app.data.recent.RecentlyPlayedStore
 import com.dengerin.app.data.repository.LibraryRepository
+import com.dengerin.app.data.resolver.SongResolver
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +37,7 @@ class PlayerController(
     private val repository: MusicExtractorRepository,
     private val recentlyPlayed: RecentlyPlayedStore,
     private val library: LibraryRepository,
+    private val songResolver: SongResolver,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -43,7 +47,13 @@ class PlayerController(
     private var mediaController: MediaController? = null
     private var connectionFuture: ListenableFuture<MediaController>? = null
     private var playRequestId = 0
+
+    // Antrean dikelola penuh di sini: URL audio YouTube diekstrak on-demand,
+    // sehingga exoPlayer.shuffleModeEnabled tidak dipakai.
     private var originalQueue: List<Song> = emptyList()
+    private var activeQueue: List<Song> = emptyList()
+    private var currentIndex: Int = -1
+    private var advancing = false
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -51,14 +61,21 @@ class PlayerController(
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == Player.STATE_ENDED) {
-                val state = mutableState.value
-                if (state.repeatMode == PlayerUiState.REPEAT_ALL) {
-                    skipNext()
-                } else {
+            if (playbackState != Player.STATE_ENDED) return
+
+            if (mutableState.value.repeatMode == PlayerUiState.REPEAT_ONE) {
+                val controller = mediaController
+                if (controller == null) {
                     mutableState.update { it.copy(isPlaying = false, positionMs = 0L) }
+                } else {
+                    controller.seekTo(0L)
+                    controller.play()
+                    mutableState.update { it.copy(isPlaying = true, positionMs = 0L) }
                 }
+                return
             }
+
+            playNext(fromAutoAdvance = true)
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -121,39 +138,45 @@ class PlayerController(
 
     /**
      * Putar satu lagu dari antrean. Saat Shuffle aktif, lagu yang dipilih tetap
-     * diputar sekarang dan sisa antrean diacak (tidak memotong lagu berjalan).
+     * ditempatkan di indeks 0 dan sisanya diacak (tidak memotong lagu berjalan).
      */
     fun playSong(song: Song, queue: List<Song> = listOf(song), randomStart: Boolean = false) {
         val safeQueue = queue.ifEmpty { listOf(song) }.distinctSongs()
         originalQueue = safeQueue
-        val shuffle = mutableState.value.isShuffle
-        val actualQueue = when {
-            !shuffle -> safeQueue
+        activeQueue = when {
+            !mutableState.value.isShuffle -> safeQueue
             randomStart -> safeQueue.shuffled()
             else -> shuffleKeeping(song, safeQueue)
         }
-        val first = if (shuffle && randomStart) actualQueue.firstOrNull() ?: song else song
-        playInternal(first, actualQueue)
+        if (activeQueue.isEmpty()) return
+
+        val startIndex = activeQueue.indexOfFirst { sameSong(it, song) }
+            .takeIf { it >= 0 } ?: 0
+        scope.launch { playInternal(startIndex) }
     }
 
     /**
-     * Dipakai tombol putar playlist: kalau Shuffle aktif, seluruh antrean diacak
-     * dan lagu pertama dari hasil acakan yang langsung diputar.
+     * Dipakai tombol putar playlist: kalau Shuffle aktif, lagu pertama diambil
+     * secara acak lalu ditempatkan di indeks 0 antrean aktif.
      */
     fun playQueue(queue: List<Song>, shuffleStart: Boolean = false) {
         val safeQueue = queue.distinctSongs()
         if (safeQueue.isEmpty()) return
         val randomStart = shuffleStart && mutableState.value.isShuffle
         val first = if (randomStart) safeQueue.random() else safeQueue.first()
-        playSong(first, safeQueue, randomStart = randomStart)
+        playSong(first, safeQueue)
     }
 
-    private fun playInternal(song: Song, queue: List<Song>) {
+    private suspend fun playInternal(index: Int, suppressError: Boolean = false): Boolean {
+        if (index !in activeQueue.indices) return false
+        val song = activeQueue[index]
+        currentIndex = index
         val requestId = ++playRequestId
+
         mutableState.update {
             it.copy(
                 song = song,
-                queue = queue,
+                queue = activeQueue,
                 isPlaying = false,
                 isLoading = true,
                 positionMs = 0L,
@@ -162,77 +185,149 @@ class PlayerController(
             )
         }
 
-        scope.launch {
-            val liked = runCatching { library.isLiked(song.spotifyId.ifBlank { song.id }) }.getOrDefault(false)
-            if (requestId == playRequestId) mutableState.update { it.copy(isLiked = liked) }
+        val liked = runCatching { library.isLiked(song.spotifyId.ifBlank { song.id }) }.getOrDefault(false)
+        if (requestId == playRequestId) mutableState.update { it.copy(isLiked = liked) }
 
-            val resolved = if (song.url.isBlank()) {
-                withContext(Dispatchers.IO) { library.resolve(song) }
+        val resolved = try {
+            if (song.url.isBlank()) {
+                withContext(Dispatchers.IO) { songResolver.resolve(song) }
             } else {
                 Result.success(song)
             }
-            if (requestId != playRequestId) return@launch
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Result.failure(error)
+        }
+        if (requestId != playRequestId) return false
 
-            resolved.fold(
-                onSuccess = { ready ->
-                    recentlyPlayed.add(ready)
-                    scope.launch(Dispatchers.IO) { library.recordPlay(ready) }
-                    val controller = mediaController
-                    if (controller == null) {
-                        mutableState.update { it.copy(isLoading = false, error = "Pemutar belum tersambung.") }
-                        return@fold
-                    }
+        return resolved.fold(
+            onSuccess = { ready ->
+                if (requestId != playRequestId) return@fold false
+                recentlyPlayed.add(ready)
+                scope.launch(Dispatchers.IO) { library.recordPlay(ready) }
 
-                    val streamResult = withContext(Dispatchers.IO) { repository.getAudioStreamUrl(ready.url) }
-                    if (requestId != playRequestId) return@fold
-                    streamResult.fold(
-                        onSuccess = { stream ->
-                            StreamHeaderState.configure(stream.userAgent, stream.headers)
-                            val mediaItem = MediaItem.Builder()
-                                .setUri(stream.audioUrl)
-                                .setMediaId(ready.id)
-                                .setMediaMetadata(
-                                    MediaMetadata.Builder()
-                                        .setTitle(ready.title)
-                                        .setArtist(ready.artist)
-                                        .setArtworkUri(android.net.Uri.parse(ready.thumbnailUrl))
-                                        .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
-                                        .build(),
-                                )
-                                .build()
-                            controller.setMediaItem(mediaItem)
-                            controller.prepare()
-                            controller.play()
-                            mutableState.update {
-                                it.copy(
-                                    song = ready,
-                                    isLoading = false,
-                                    queue = it.queue.map { q -> if (q.id == song.id || q.spotifyId == song.spotifyId) ready else q },
-                                )
-                            }
-                        },
-                        onFailure = { throwable ->
-                            mutableState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    error = throwable.message?.takeIf { m -> m.isNotBlank() }
-                                        ?: "Gagal mengambil audio lagu ini.",
-                                )
-                            }
-                        },
-                    )
-                },
-                onFailure = { throwable ->
-                    mutableState.update {
-                        it.copy(
-                            isLoading = false,
-                            error = throwable.message?.takeIf { m -> m.isNotBlank() }
-                                ?: "Lagu ini belum bisa diputar sekarang.",
-                        )
-                    }
+                val controller = mediaController
+                if (controller == null) {
+                    handlePlayFailure(IllegalStateException("Pemutar belum tersambung."), suppressError)
+                    return@fold false
+                }
+
+                val streamResult = withContext(Dispatchers.IO) { repository.getAudioStreamUrl(ready.url) }
+                if (requestId != playRequestId) return@fold false
+
+                streamResult.fold(
+                    onSuccess = { stream ->
+                        StreamHeaderState.configure(stream.userAgent, stream.headers)
+                        val mediaItem = MediaItem.Builder()
+                            .setUri(stream.audioUrl)
+                            .setMediaId(ready.id)
+                            .setMediaMetadata(
+                                MediaMetadata.Builder()
+                                    .setTitle(ready.title)
+                                    .setArtist(ready.artist)
+                                    .setArtworkUri(Uri.parse(ready.thumbnailUrl))
+                                    .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
+                                    .build(),
+                            )
+                            .build()
+                        controller.setMediaItem(mediaItem)
+                        controller.prepare()
+                        controller.play()
+                        markResolved(index, ready)
+                        mutableState.update { it.copy(isLoading = false) }
+                        true
+                    },
+                    onFailure = { throwable ->
+                        handlePlayFailure(throwable, suppressError)
+                        false
+                    },
+                )
+            },
+            onFailure = { throwable ->
+                handlePlayFailure(throwable, suppressError)
+                false
+            },
+        )
+    }
+
+    private fun markResolved(index: Int, resolved: Song) {
+        if (index in activeQueue.indices) {
+            activeQueue = activeQueue.toMutableList().also { it[index] = resolved }
+        }
+        originalQueue = originalQueue.map { item -> if (sameSong(item, resolved)) resolved else item }
+        currentIndex = index
+        mutableState.update { it.copy(song = resolved, queue = activeQueue) }
+    }
+
+    private fun handlePlayFailure(throwable: Throwable, suppressError: Boolean) {
+        Log.w(TAG, "Gagal menyiapkan audio lagu berikutnya.", throwable)
+        mutableState.update { state ->
+            state.copy(
+                isLoading = false,
+                isPlaying = false,
+                error = if (suppressError) {
+                    null
+                } else {
+                    throwable.message?.takeIf { it.isNotBlank() }
+                        ?: "Lagu ini belum bisa diputar sekarang."
                 },
             )
         }
+    }
+
+    /**
+     * Lanjut ke lagu berikutnya di [activeQueue]. Kegagalan ekstraksi satu lagu
+     * langsung dilewati, maksimal [AUTO_ADVANCE_ATTEMPTS] lagu berturut-turut.
+     */
+    fun playNext(fromAutoAdvance: Boolean = false) {
+        if (advancing) return
+        scope.launch {
+            advancing = true
+            try {
+                if (activeQueue.isEmpty()) {
+                    mutableState.update { it.copy(isPlaying = false, isLoading = false, positionMs = 0L) }
+                    return@launch
+                }
+
+                val startIndex = currentIndex.takeIf { it in activeQueue.indices } ?: 0
+                var cursor = startIndex
+                var attempts = 0
+                while (attempts < AUTO_ADVANCE_ATTEMPTS) {
+                    val next = nextIndexAfter(cursor) ?: run {
+                        mutableState.update {
+                            it.copy(isPlaying = false, isLoading = false, positionMs = 0L)
+                        }
+                        return@launch
+                    }
+                    val suppressError = fromAutoAdvance && attempts < AUTO_ADVANCE_ATTEMPTS - 1
+                    if (playInternal(next, suppressError)) return@launch
+                    cursor = next
+                    attempts++
+                }
+                mutableState.update {
+                    it.copy(
+                        isLoading = false,
+                        isPlaying = false,
+                        error = "Beberapa lagu belum bisa diputar. Coba lagu lain ya.",
+                    )
+                }
+            } finally {
+                advancing = false
+            }
+        }
+    }
+
+    private fun nextIndexAfter(cursor: Int): Int? {
+        val next = cursor + 1
+        if (next in activeQueue.indices) return next
+        if (mutableState.value.repeatMode != PlayerUiState.REPEAT_ALL) return null
+
+        if (mutableState.value.isShuffle) {
+            activeQueue = originalQueue.shuffled()
+            mutableState.update { it.copy(queue = activeQueue) }
+        }
+        return 0
     }
 
     fun togglePlayPause() {
@@ -250,12 +345,14 @@ class PlayerController(
     }
 
     fun skipNext() {
-        val state = mutableState.value
-        if (state.repeatMode == PlayerUiState.REPEAT_ONE) {
-            state.song?.let { playInternal(it, state.queue) }
+        if (mutableState.value.repeatMode == PlayerUiState.REPEAT_ONE) {
+            val controller = mediaController ?: return
+            controller.seekTo(0L)
+            controller.play()
+            mutableState.update { it.copy(positionMs = 0L, isPlaying = true) }
             return
         }
-        skipBy(1)
+        playNext(fromAutoAdvance = false)
     }
 
     fun skipPrevious() {
@@ -268,17 +365,15 @@ class PlayerController(
     }
 
     private fun skipBy(offset: Int) {
-        val state = mutableState.value
-        val currentIndex = state.queue.indexOfFirst { sameSong(it, state.song) }
-        if (currentIndex < 0) return
-        val targetIndex = currentIndex + offset
-        if (targetIndex !in state.queue.indices) {
-            if (state.repeatMode == PlayerUiState.REPEAT_ALL && state.queue.isNotEmpty()) {
-                playInternal(state.queue.first(), state.queue)
-            }
-            return
+        if (activeQueue.isEmpty()) return
+        val base = currentIndex.takeIf { it in activeQueue.indices } ?: 0
+        var target = base + offset
+        if (target !in activeQueue.indices) {
+            if (mutableState.value.repeatMode != PlayerUiState.REPEAT_ALL) return
+            target = if (target < 0) activeQueue.lastIndex else 0
         }
-        playInternal(state.queue[targetIndex], state.queue)
+        val index = target
+        scope.launch { playInternal(index) }
     }
 
     fun toggleLike() {
@@ -292,13 +387,14 @@ class PlayerController(
     fun toggleShuffle() {
         val next = !mutableState.value.isShuffle
         val current = mutableState.value.song
-        mutableState.update { state ->
-            val base = originalQueue.ifEmpty { state.queue }
-            // Menyalakan: lagu saat ini tetap berjalan, sisa antrean diacak.
-            // Mematikan: urutan asli dipulihkan, lagu saat ini tidak diganti.
-            val queue = if (next) shuffleKeeping(current, base) else base
-            state.copy(isShuffle = next, queue = queue)
-        }
+        val base = originalQueue.ifEmpty { activeQueue }
+
+        // Menyalakan: lagu saat ini ditempatkan di indeks 0, sisa lagu diacak.
+        // Mematikan: urutan asli dipulihkan dengan lagu saat ini tetap diputar.
+        activeQueue = if (next) shuffleKeeping(current, base) else base
+        currentIndex = activeQueue.indexOfFirst { sameSong(it, current) }
+            .takeIf { it >= 0 } ?: 0
+        mutableState.update { state -> state.copy(isShuffle = next, queue = activeQueue) }
     }
 
     fun cycleRepeat() {
@@ -352,5 +448,6 @@ class PlayerController(
     private companion object {
         const val TAG = "DengerinPlayer"
         const val POSITION_TICK_MS = 160L
+        const val AUTO_ADVANCE_ATTEMPTS = 3
     }
 }

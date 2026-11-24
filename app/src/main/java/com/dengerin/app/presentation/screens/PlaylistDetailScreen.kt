@@ -402,7 +402,12 @@ fun PlaylistDetailScreen(
                         )
                     }
                 } else {
-                    itemsIndexed(items = visibleTracks, key = { _, song -> song.id }) { index, song ->
+                    // `id` di sini adalah videoUrl YouTube yang bisa duplikat saat
+                    // beberapa trek Spotify cocok ke video sama. Indeks menjamin keunikan.
+                    itemsIndexed(
+                        items = visibleTracks,
+                        key = { index, track -> "${track.id}_${index}" },
+                    ) { index, song ->
                         SongRow(
                             song = song,
                             isActive = sameTrack(song, playerState.song),

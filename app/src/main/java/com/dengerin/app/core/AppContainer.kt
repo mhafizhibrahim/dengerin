@@ -30,6 +30,12 @@ class AppContainer(context: Context) {
     val lyricsRepository = LyricsRepository(dao)
 
     val playerController by lazy {
-        PlayerController(appContext, musicExtractorRepository, recentlyPlayedStore, libraryRepository)
+        PlayerController(
+            appContext,
+            musicExtractorRepository,
+            recentlyPlayedStore,
+            libraryRepository,
+            songResolver,
+        )
     }
 }

@@ -1,5 +1,6 @@
 package com.dengerin.app.data.repository
 
+import android.util.Log
 import com.dengerin.app.data.db.DengerinDao
 import com.dengerin.app.data.db.LocalPlaylistEntity
 import com.dengerin.app.data.db.PlayHistoryEntity
@@ -10,9 +11,15 @@ import com.dengerin.app.data.model.Song
 import com.dengerin.app.data.resolver.SongResolver
 import com.dengerin.app.data.spotify.SpotifyPublicImportRepository
 import com.dengerin.app.domain.model.SpotifyTrack
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -22,6 +29,9 @@ class LibraryRepository(
     private val publicImport: SpotifyPublicImportRepository,
     private val resolver: SongResolver,
 ) {
+    /** Worker sisa lagu hidup di Repository, bukan di ViewModel/Compose. */
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val backgroundPermits = Semaphore(BACKGROUND_CONCURRENCY)
 
     val history: Flow<List<Song>> = dao.observeHistory().map { items -> items.map { it.toSong() } }
     val frequent: Flow<List<Song>> = dao.observeFrequent().map { items -> items.map { it.toSong() } }
@@ -174,8 +184,6 @@ class LibraryRepository(
             dao.clearTracks(imported.id)
             dao.insertTracks(imported.tracks.toEntities(imported.id))
 
-            // Cover playlist hanya fallback. Langsung cocokkan semua lagu ke YouTube
-            // supaya thumbnail asli dan URL putar tersedia sebelum playlist dibuka.
             val unresolved = imported.tracks.map { track ->
                 Song(
                     id = track.id,
@@ -187,11 +195,39 @@ class LibraryRepository(
                     spotifyId = track.id,
                     source = "SPOTIFY",
                 )
-            }
+            }.filter { it.url.isBlank() || it.thumbnailUrl.isBlank() }
+
             if (unresolved.isNotEmpty()) {
-                onProgress("Mencocokkan 0/${unresolved.size} lagu…")
-                resolver.resolveAll(unresolved) { done, total ->
-                    onProgress("Mencocokkan $done/$total lagu…")
+                // Tahap 1: 10 lagu pertama diblokir sebentar supaya sampul HD sudah
+                // tampil begitu PlaylistDetailScreen dibuka. SongResolver memakai
+                // Semaphore(4) di Dispatchers.IO dan langsung UPDATE Room per lagu.
+                val firstBatch = unresolved.take(FIRST_BATCH_SIZE)
+                onProgress("Menyiapkan sampul lagu (0/${firstBatch.size})…")
+                resolver.resolveAll(firstBatch) { done, total ->
+                    onProgress("Menyiapkan sampul lagu ($done/$total)…")
+                }
+
+                // Tahap 2: sisanya menyusul di worker Repository dengan konkurensi
+                // lebih rendah agar aman dari rate-limit YouTube.
+                val rest = unresolved.drop(FIRST_BATCH_SIZE)
+                if (rest.isNotEmpty()) {
+                    onProgress("Sisa sampul lagu sedang disiapkan di latar belakang…")
+                    backgroundScope.launch {
+                        rest.forEach { song ->
+                            backgroundPermits.withPermit {
+                                try {
+                                    resolver.resolve(song).getOrThrow()
+                                } catch (error: CancellationException) {
+                                    throw error
+                                } catch (error: Throwable) {
+                                    Log.w(
+                                        TAG,
+                                        "Gagal mencocokkan thumbnail ${song.title}: ${error.message}",
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
             imported.id
@@ -220,12 +256,16 @@ class LibraryRepository(
             spotifyId = track.id,
             title = track.title,
             artist = track.artist,
-            thumbnailUrl = track.thumbnailUrl,
+            // Tanpa gambar trek asli, jangan pinjam cover playlist.
+            thumbnailUrl = track.thumbnailUrl.takeIf { it.isNotBlank() }.orEmpty(),
             durationMs = track.durationMs,
         )
     }
 
     companion object {
+        const val TAG = "DengerinLibrary"
+        const val FIRST_BATCH_SIZE = 10
+        const val BACKGROUND_CONCURRENCY = 3
         const val PLAYLIST_LIKED = "__liked__"
         const val PLAYLIST_HISTORY = "__history__"
     }

@@ -22,11 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.dengerin.app.R
 import com.dengerin.app.core.theme.LocalDengerinColors
 import com.dengerin.app.core.upgradeThumbnailUrl
@@ -42,6 +44,19 @@ fun SongRow(
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalDengerinColors.current
+    val context = LocalContext.current
+    // Decode dibatasi 144 px (3x ukuran tampilan 52 dp) agar fling 100+ lagu
+    // tidak membanjiri memori saat Coil mengcache thumbnail YouTube.
+    val thumbnailUrl = upgradeThumbnailUrl(song.thumbnailUrl)?.takeIf { it.isNotBlank() }
+    val coverModel = if (thumbnailUrl != null) {
+        ImageRequest.Builder(context)
+            .data(thumbnailUrl)
+            .size(THUMBNAIL_DECODE_SIZE)
+            .crossfade(false)
+            .build()
+    } else {
+        R.drawable.ic_music_placeholder
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -51,9 +66,7 @@ fun SongRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model = upgradeThumbnailUrl(song.thumbnailUrl)
-                ?.takeIf { it.isNotBlank() }
-                ?: R.drawable.ic_music_placeholder,
+            model = coverModel,
             contentDescription = null,
             placeholder = painterResource(R.drawable.ic_music_placeholder),
             error = painterResource(R.drawable.ic_music_placeholder),
@@ -108,3 +121,5 @@ fun SongRow(
         }
     }
 }
+
+private const val THUMBNAIL_DECODE_SIZE = 144

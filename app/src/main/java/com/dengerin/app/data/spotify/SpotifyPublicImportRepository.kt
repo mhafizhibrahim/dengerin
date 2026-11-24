@@ -85,7 +85,7 @@ class SpotifyPublicImportRepository {
         val array = container.optJSONArray("trackList") ?: JSONArray()
         val tracks = mutableListOf<SpotifyTrack>()
         for (index in 0 until array.length()) {
-            val track = parseEmbedTrack(array.optJSONObject(index) ?: continue, cover)
+            val track = parseEmbedTrack(array.optJSONObject(index) ?: continue)
             if (track != null) tracks += track
         }
         if (tracks.isEmpty()) throw IllegalStateException("Playlist ini kosong atau tidak bisa diimpor.")
@@ -98,7 +98,7 @@ class SpotifyPublicImportRepository {
         )
     }
 
-    private fun parseEmbedTrack(json: JSONObject, playlistCover: String): SpotifyTrack? {
+    private fun parseEmbedTrack(json: JSONObject): SpotifyTrack? {
         val uri = json.optString("uri").ifBlank { json.optString("uid") }
         val id = uri.substringAfterLast(":").ifBlank { return null }
         val title = json.optString("title").ifBlank { return null }
@@ -110,8 +110,9 @@ class SpotifyPublicImportRepository {
             title = title,
             artist = artist,
             durationMs = parseDuration(json.optString("duration")),
-            // Sampul playlist dipakai sementara sampai SongResolver cocokkan ke YouTube.
-            thumbnailUrl = trackImage.ifBlank { playlistCover },
+            // Tanpa gambar trek, biarkan kosong: sampul playlist tidak dipinjam.
+            // SongResolver yang akan mengisi thumbnail YouTube asli.
+            thumbnailUrl = trackImage,
             uri = uri,
         )
     }
