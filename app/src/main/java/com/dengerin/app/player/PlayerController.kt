@@ -3,6 +3,7 @@ package com.dengerin.app.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
@@ -13,6 +14,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.dengerin.app.data.extractor.MusicExtractorRepository
 import com.dengerin.app.data.model.Song
+import com.dengerin.app.data.profile.ProfileRepository
 import com.dengerin.app.data.recent.RecentlyPlayedStore
 import com.dengerin.app.data.repository.LibraryRepository
 import com.dengerin.app.data.resolver.SongResolver
@@ -38,6 +40,7 @@ class PlayerController(
     private val recentlyPlayed: RecentlyPlayedStore,
     private val library: LibraryRepository,
     private val songResolver: SongResolver,
+    private val profileRepository: ProfileRepository,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -54,6 +57,10 @@ class PlayerController(
     private var activeQueue: List<Song> = emptyList()
     private var currentIndex: Int = -1
     private var advancing = false
+
+    // XP hanya dihitung dari waktu benar-benar playing, bukan dari position seek.
+    private var listeningAccumulatorMs = 0L
+    private var lastListeningMarkMs = 0L
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -106,6 +113,7 @@ class PlayerController(
                         mediaController = controller
                         controller.addListener(playerListener)
                         startPositionTicker()
+                        startListeningTracker()
                     }
                     .onFailure {
                         mutableState.update { it.copy(error = "Pemutar belum tersedia. Coba lagi sebentar.") }
@@ -131,6 +139,33 @@ class PlayerController(
                     }
                 }
                 // 160 ms: perpindahan baris lirik terasa pas ketukan tanpa membanjiri recomposition.
+                delay(POSITION_TICK_MS)
+            }
+        }
+    }
+
+    /**
+     * Tracker XP. Tick 160 ms memakai elapsedRealtime supaya pause/seek tidak
+     * menghasilkan XP; tiap 60 detik playing efektif masuk ke [profileRepository].
+     */
+    private fun startListeningTracker() {
+        scope.launch {
+            while (isActive) {
+                val controller = mediaController
+                if (controller?.isPlaying == true) {
+                    val now = SystemClock.elapsedRealtime()
+                    if (lastListeningMarkMs != 0L) {
+                        listeningAccumulatorMs += now - lastListeningMarkMs
+                    }
+                    lastListeningMarkMs = now
+
+                    if (listeningAccumulatorMs >= LISTENING_TICK_MS) {
+                        listeningAccumulatorMs -= LISTENING_TICK_MS
+                        scope.launch { profileRepository.addListeningMinute() }
+                    }
+                } else {
+                    lastListeningMarkMs = 0L
+                }
                 delay(POSITION_TICK_MS)
             }
         }
@@ -234,6 +269,7 @@ class PlayerController(
                         controller.setMediaItem(mediaItem)
                         controller.prepare()
                         controller.play()
+                        scope.launch { profileRepository.recordSongPlayed() }
                         markResolved(index, ready)
                         mutableState.update { it.copy(isLoading = false) }
                         true
@@ -448,6 +484,7 @@ class PlayerController(
     private companion object {
         const val TAG = "DengerinPlayer"
         const val POSITION_TICK_MS = 160L
+        const val LISTENING_TICK_MS = 60_000L
         const val AUTO_ADVANCE_ATTEMPTS = 3
     }
 }

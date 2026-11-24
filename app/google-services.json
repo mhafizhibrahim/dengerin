@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "133034370453",
+    "project_id": "dengerin-c2b40",
+    "storage_bucket": "dengerin-c2b40.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:133034370453:android:db96e10cec09210b0b429c",
+        "android_client_info": {
+          "package_name": "com.dengerin.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "133034370453-a8m9a7ie2pb15uk6at1ipo9o8d3u5tni.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dengerin.app",
+            "certificate_hash": "231b32417550b37011f1ef88413c6efc32d7eb6f"
+          }
+        },
+        {
+          "client_id": "133034370453-mllpuk3jcclvuonod29j71m2v2j7lcid.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dengerin.app",
+            "certificate_hash": "5f9b7062447dc7f9028cc2b6305f07c876e72b3d"
+          }
+        },
+        {
+          "client_id": "133034370453-tnqhvo2n5i0q9506j6fjd9dqbsomm6dp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCS4tl19E_cO6-2XOkMyxGUpMQnoaWkwts"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "133034370453-tnqhvo2n5i0q9506j6fjd9dqbsomm6dp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

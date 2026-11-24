@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,6 +44,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,10 +56,18 @@ import com.dengerin.app.core.theme.LocalDengerinColors
 import com.dengerin.app.core.upgradeThumbnailUrl
 import com.dengerin.app.core.util.formatDuration
 import com.dengerin.app.data.model.Song
+import com.dengerin.app.data.profile.UserProfile
+import com.dengerin.app.data.profile.isDeveloper
 import com.dengerin.app.data.repository.LibraryRepository
 import com.dengerin.app.player.PlayerUiState
 import com.dengerin.app.presentation.ArtistItem
 import com.dengerin.app.presentation.HomeViewModel
+import com.dengerin.app.presentation.profile.DevBadge
+import com.dengerin.app.presentation.profile.FramedAvatar
+import com.dengerin.app.presentation.profile.avatarInitial
+import com.dengerin.app.presentation.profile.SmallLevelBadge
+import com.dengerin.app.presentation.profile.frameById
+import com.dengerin.app.presentation.profile.levelOf
 
 private enum class HomeFilter { SEMUA, MUSIK, PLAYLIST, RIWAYAT }
 
@@ -68,7 +79,11 @@ fun HomeScreen(
     onImportLink: () -> Unit,
     onOpenPlaylist: (String) -> Unit,
     onSongClick: (Song, List<Song>) -> Unit,
+    onTogglePlayPause: () -> Unit = {},
     onArtistClick: (String) -> Unit,
+    profile: UserProfile? = null,
+    email: String = "",
+    onOpenProfile: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -121,6 +136,16 @@ fun HomeScreen(
     val frequent = state.frequent
         .distinctBy { it.spotifyId.ifBlank { it.id } }
         .take(12)
+
+    // Hero: riwayat + lagu disukai, dilengkapi katalog populer bila riwayat sedikit.
+    val heroSongs = buildList {
+        addAll(state.history)
+        addAll(state.liked)
+        addAll(state.hits)
+        addAll(state.chill)
+    }
+        .distinctBy { it.spotifyId.ifBlank { it.id } }
+        .take(8)
 
     // Rak kosong tetap diisi katalog lokal.
     val recentSource = if (recent.isNotEmpty() || filter == HomeFilter.RIWAYAT) recent else state.hits
@@ -189,20 +214,76 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = greeting(),
-                    color = colors.textPrimary,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = greeting(profile?.displayName),
+                        color = colors.textPrimary,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = "Dengerin lagu, tanpa drama iklan.",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                ProfileAvatarButton(profile = profile, email = email, onClick = onOpenProfile)
+            }
+        }
+
+        if (heroSongs.isNotEmpty()) {
+            item {
+                HeroCoverflowCarousel(
+                    songs = heroSongs,
+                    playerState = playerState,
+                    onPlaySong = onSongClick,
+                    onTogglePlayPause = onTogglePlayPause,
                 )
-                Text(
-                    text = "Dengerin lagu, tanpa drama iklan.",
-                    color = colors.textSecondary,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            }
+        }
+
+        item {
+            MoodChipRow(
+                selectedMood = state.selectedMood,
+                onMoodSelected = viewModel::selectMood,
+            )
+        }
+
+        if (state.selectedMood != "Semua") {
+            item {
+                SectionTitle("Rekomendasi ${state.selectedMood}")
+                when {
+                    state.moodRecommendations.isNotEmpty() -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            state.moodRecommendations.forEach { song ->
+                                CatalogCard(
+                                    card = song.toCard(state.moodRecommendations, onSongClick),
+                                    isActive = song.id == playerState.song?.id,
+                                )
+                            }
+                        }
+                    }
+
+                    state.isLoadingMood -> Text(
+                        text = "Memuat rekomendasi lagu…",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+
+                    else -> Text(
+                        text = "Belum ada rekomendasi untuk mood ini.",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
 
@@ -398,8 +479,9 @@ private fun ArtistCard(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         AsyncImage(
-            model = upgradeThumbnailUrl(artist.thumbnailUrl)
-                ?.takeIf { it.isNotBlank() }
+            // Foto wajah dari Deezer diutamakan; thumbnail lagu hanya fallback.
+            model = artist.imageUrl.takeIf { it.isNotBlank() }
+                ?: upgradeThumbnailUrl(artist.thumbnailUrl)?.takeIf { it.isNotBlank() }
                 ?: R.drawable.ic_music_placeholder,
             contentDescription = "Foto artis ${artist.name}",
             placeholder = painterResource(R.drawable.ic_music_placeholder),
@@ -530,6 +612,64 @@ private fun CatalogCard(card: CardItem, isActive: Boolean) {
     }
 }
 
+@Composable
+private fun ProfileAvatarButton(
+    profile: UserProfile?,
+    email: String,
+    onClick: () -> Unit,
+) {
+    val colors = LocalDengerinColors.current
+    // Badge diletakkan di luar avatar (bukan di dalam clip lingkaran) supaya
+    // "Lv. 111" dan pill DEV tidak terpotong atau menumpuk di atas foto.
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (profile != null) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                if (isDeveloper(email)) DevBadge(compact = true)
+                SmallLevelBadge(level = levelOf(profile))
+            }
+        }
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clickable(onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = "Buka profil" },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (profile == null) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(colors.surface)
+                        .border(1.dp, colors.border, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            } else {
+                FramedAvatar(
+                    photoUrl = profile.photoUrl.takeIf { it.isNotBlank() },
+                    photoBase64 = profile.photoBase64.takeIf { it.isNotBlank() },
+                    frame = frameById(profile.equippedFrameId),
+                    size = 42.dp,
+                    defaultInitial = avatarInitial(profile.displayName),
+                )
+            }
+        }
+    }
+}
+
 private fun Song.toCard(queue: List<Song>, onClick: (Song, List<Song>) -> Unit) = CardItem(
     id = id,
     title = title,
@@ -559,12 +699,14 @@ private data class CardItem(
 
 private data class Carousel(val title: String, val items: List<CardItem>)
 
-private fun greeting(): String {
+private fun greeting(displayName: String?): String {
     val hour = java.time.LocalTime.now().hour
-    return when (hour) {
+    val base = when (hour) {
         in 5..10 -> "Selamat Pagi"
         in 11..14 -> "Selamat Siang"
         in 15..17 -> "Selamat Sore"
         else -> "Selamat Malam"
     }
+    val name = displayName?.trim().orEmpty()
+    return if (name.isBlank()) base else "$base, $name"
 }

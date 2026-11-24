@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -67,6 +68,11 @@ class MainActivity : ComponentActivity() {
                         currentVersion = currentVersion,
                         onDismiss = { pendingUpdate = null },
                     )
+                }
+                if (pendingUpdate != null) {
+                    // Dialog update sengaja tidak bisa ditutup dengan back. Serap back di sini
+                    // supaya NavHost tidak mem-pop halaman di belakang dialog.
+                    BackHandler(enabled = true) {}
                 }
             }
         }

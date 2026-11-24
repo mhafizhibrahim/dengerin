@@ -1,10 +1,13 @@
 import java.util.Properties
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 // Rahasia signing dibaca dari keystore.properties di root (di-gitignore).
@@ -30,8 +33,8 @@ android {
         applicationId = "com.dengerin.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.1"
+        versionCode = 4
+        versionName = "1.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -51,8 +54,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
     }
 
     buildFeatures {
@@ -80,6 +85,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Room: history, liked songs, playlist, dan cache pencocokan audio.
     implementation(libs.androidx.room.runtime)
@@ -88,6 +94,16 @@ dependencies {
 
     // Warna dominan sampul untuk gradien Now Playing / Detail Playlist.
     implementation(libs.androidx.palette.ktx)
+
+    // Firebase Auth + Cloud Firestore untuk profil opsional.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+
+    // Credential Manager: tombol "Masuk dengan Google" tanpa WebView OAuth.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     // Media3: background playback + notifikasi & lockscreen.
     implementation(libs.androidx.media3.exoplayer)

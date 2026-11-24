@@ -1,6 +1,7 @@
 package com.dengerin.app.presentation
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,6 +49,7 @@ import com.dengerin.app.R
 import com.dengerin.app.core.AppContainer
 import com.dengerin.app.core.theme.LocalDengerinColors
 import com.dengerin.app.data.model.Song
+import com.dengerin.app.data.profile.UserProfile
 import com.dengerin.app.player.PlayerController
 import com.dengerin.app.player.PlayerUiState
 import com.dengerin.app.presentation.components.AddToPlaylistSheet
@@ -57,10 +59,13 @@ import com.dengerin.app.presentation.screens.HomeScreen
 import com.dengerin.app.presentation.screens.LibraryScreen
 import com.dengerin.app.presentation.screens.NowPlayingScreen
 import com.dengerin.app.presentation.screens.PlaylistDetailScreen
+import com.dengerin.app.presentation.screens.ProfileScreen
 import com.dengerin.app.presentation.screens.SearchScreen
+import com.dengerin.app.presentation.profile.ProfileViewModel
 
 private const val ROUTE_TABS = "tabs"
 private const val ROUTE_NOW_PLAYING = "now_playing"
+private const val ROUTE_PROFILE = "profile"
 private const val ROUTE_FULLSCREEN_LYRICS = "fullscreen_lyrics"
 private const val ROUTE_PLAYLIST_DETAIL = "playlist_detail/{playlistId}"
 
@@ -71,12 +76,31 @@ fun DengerinApp(container: AppContainer) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val playerState by container.playerController.uiState.collectAsState()
+    val authUser by container.profileRepository.authState.collectAsState()
+    val cachedProfile by container.profileRepository.profile.collectAsState()
+    val homeProfile: UserProfile? = if (authUser != null) cachedProfile else null
+    val homeEmail = if (authUser != null) authUser?.email.orEmpty() else ""
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
+    // Tab dipegang di root supaya back bisa mengembalikan Cari/Koleksi ke Beranda.
+    // Rute lain tetap memakai popBackStack() masing-masing (lirik -> player -> playlist).
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var sheetSong by remember { mutableStateOf<Song?>(null) }
+
+    BackHandler(
+        enabled = currentRoute == ROUTE_TABS && selectedTab != 0 && sheetSong == null,
+    ) {
+        selectedTab = 0
+    }
+
     // ViewModel dibuat di root supaya tidak reload saat pindah tab / buka player.
     val homeViewModel = remember {
-        HomeViewModel(container.libraryRepository, container.musicExtractorRepository)
+        HomeViewModel(
+            container.libraryRepository,
+            container.musicExtractorRepository,
+            container.artistImageRepository,
+        )
     }
     val libraryViewModel = remember { LibraryViewModel(container.libraryRepository) }
     val searchViewModel = remember {
@@ -85,8 +109,10 @@ fun DengerinApp(container: AppContainer) {
     val lyricsViewModel = remember {
         LyricsViewModel(container.playerController, container.lyricsRepository)
     }
+    val profileViewModel = remember {
+        ProfileViewModel(container.profileRepository, container.libraryRepository)
+    }
 
-    var sheetSong by remember { mutableStateOf<Song?>(null) }
     val addToPlaylistViewModel = remember(sheetSong?.id) {
         sheetSong?.let { song -> AddToPlaylistViewModel(song, container.libraryRepository) }
     }
@@ -97,7 +123,8 @@ fun DengerinApp(container: AppContainer) {
 
     val showMiniPlayer = playerState.song != null &&
         currentRoute != ROUTE_NOW_PLAYING &&
-        currentRoute != ROUTE_FULLSCREEN_LYRICS
+        currentRoute != ROUTE_FULLSCREEN_LYRICS &&
+        currentRoute != ROUTE_PROFILE
 
     // Satu slot mini player dipakai Scaffold utama dan detail playlist.
     val miniPlayer: @Composable (showBottomBar: Boolean) -> Unit = { showBottomBar ->
@@ -120,6 +147,8 @@ fun DengerinApp(container: AppContainer) {
             composable(ROUTE_TABS) {
                 MainTabs(
                     container = container,
+                    selectedTab = selectedTab,
+                    onSelectedTabChange = { selectedTab = it },
                     playerState = playerState,
                     homeViewModel = homeViewModel,
                     libraryViewModel = libraryViewModel,
@@ -128,6 +157,16 @@ fun DengerinApp(container: AppContainer) {
                     onOpenPlaylist = { id -> navController.navigate(playlistRoute(id)) },
                     onAddToPlaylist = onAddToPlaylist,
                     onArtistClick = searchViewModel::prefillAndSearch,
+                    homeProfile = homeProfile,
+                    homeEmail = homeEmail,
+                    onOpenProfile = { navController.navigate(ROUTE_PROFILE) },
+                )
+            }
+
+            composable(ROUTE_PROFILE) {
+                ProfileScreen(
+                    viewModel = profileViewModel,
+                    onClose = { navController.popBackStack() },
                 )
             }
 
@@ -219,6 +258,8 @@ private fun FloatingMiniPlayer(
 @Composable
 private fun MainTabs(
     container: AppContainer,
+    selectedTab: Int,
+    onSelectedTabChange: (Int) -> Unit,
     playerState: PlayerUiState,
     homeViewModel: HomeViewModel,
     libraryViewModel: LibraryViewModel,
@@ -227,9 +268,11 @@ private fun MainTabs(
     onOpenPlaylist: (String) -> Unit,
     onAddToPlaylist: (Song) -> Unit,
     onArtistClick: (String) -> Unit,
+    homeProfile: UserProfile?,
+    homeEmail: String,
+    onOpenProfile: () -> Unit,
 ) {
     val colors = LocalDengerinColors.current
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
     val tabs = listOf(
         TabItem(stringResource(R.string.tab_home), Icons.Filled.Home),
@@ -257,7 +300,7 @@ private fun MainTabs(
                     tabs.forEachIndexed { index, tab ->
                         NavigationBarItem(
                             selected = selectedTab == index,
-                            onClick = { selectedTab = index },
+                            onClick = { onSelectedTabChange(index) },
                             icon = {
                                 Icon(
                                     imageVector = tab.icon,
@@ -286,14 +329,18 @@ private fun MainTabs(
             0 -> HomeScreen(
                 viewModel = homeViewModel,
                 playerState = playerState,
-                onOpenSearch = { selectedTab = 1 },
-                onImportLink = { selectedTab = 2 },
+                onOpenSearch = { onSelectedTabChange(1) },
+                onImportLink = { onSelectedTabChange(2) },
                 onOpenPlaylist = onOpenPlaylist,
                 onSongClick = { song, queue -> playFromList(song, queue) },
+                onTogglePlayPause = { container.playerController.togglePlayPause() },
                 onArtistClick = { artist ->
                     onArtistClick(artist)
-                    selectedTab = 1
+                    onSelectedTabChange(1)
                 },
+                profile = homeProfile,
+                email = homeEmail,
+                onOpenProfile = onOpenProfile,
                 modifier = Modifier.padding(innerPadding),
             )
 

@@ -25,11 +25,17 @@ object UpdateChecker {
     private const val TIMEOUT_MS = 5000
     private const val FALLBACK_CHANGELOG = "Perbaikan bug dan peningkatan performa."
 
+    const val FALLBACK_RELEASE_URL =
+        "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+
     data class ReleaseInfo(
         val version: String,
         val title: String,
         val changelog: String,
+        /** URL asset .apk bila ada, kalau tidak halaman rilis. */
         val downloadUrl: String,
+        /** Halaman rilis GitHub (html_url) untuk opsi buka di browser. */
+        val releaseUrl: String = FALLBACK_RELEASE_URL,
     )
 
     /** Ambil rilis terbaru dari GitHub. Null berarti gagal / belum ada release. */
@@ -63,14 +69,15 @@ object UpdateChecker {
                     }
                 }
             }
-            val downloadUrl = apkUrl ?: json.optString("html_url").ifBlank { null }
-                ?: return@withContext null
+            val releaseUrl = json.optString("html_url").ifBlank { FALLBACK_RELEASE_URL }
+            val downloadUrl = apkUrl ?: releaseUrl
 
             ReleaseInfo(
                 version = version,
                 title = json.optString("name").ifBlank { "Versi $version" },
                 changelog = json.optString("body").ifBlank { FALLBACK_CHANGELOG },
                 downloadUrl = downloadUrl,
+                releaseUrl = releaseUrl,
             )
         } catch (e: Exception) {
             null

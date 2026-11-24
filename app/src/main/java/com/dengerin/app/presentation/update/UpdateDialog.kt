@@ -4,6 +4,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.text.format.Formatter
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -23,10 +25,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,13 +43,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.dengerin.app.core.theme.LocalDengerinColors
 import com.dengerin.app.data.update.ApkDownloader
 import com.dengerin.app.data.update.UpdateChecker
 import kotlinx.coroutines.launch
 
 /**
- * Dialog "Pembaruan Tersedia" dengan unduh langsung + progres.
+ * Dialog pembaruan wajib: tidak bisa ditutup via Back/klik luar dan tidak ada "Nanti".
+ * Dua aksi: unduh + pasang APK di aplikasi, atau buka halaman rilis GitHub.
  * Semua warna diambil dari token DESIGN_RULES.md lewat LocalDengerinColors.
  */
 @Composable
@@ -59,22 +64,35 @@ fun UpdateDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var downloading by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf(0f) }
+    var downloadedBytes by remember { mutableLongStateOf(0L) }
+    var totalBytes by remember { mutableLongStateOf(-1L) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    Dialog(onDismissRequest = { if (!downloading) onDismiss() }) {
+    val progress = if (totalBytes > 0) {
+        (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+        ),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(20.dp))
                 .background(colors.surface)
-                .border(1.dp, colors.border, RoundedCornerShape(16.dp))
+                .border(1.dp, colors.border, RoundedCornerShape(20.dp))
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(
                 imageVector = Icons.Rounded.SystemUpdate,
-                contentDescription = "Pembaruan tersedia",
+                contentDescription = "Pembaruan wajib",
                 modifier = Modifier.size(40.dp),
                 tint = colors.accent,
             )
@@ -84,6 +102,13 @@ fun UpdateDialog(
                 color = colors.textPrimary,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Versi terbaru sudah tersedia. Yuk, perbarui sekarang.",
+                color = colors.textSecondary,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(8.dp))
             Text(
@@ -101,18 +126,36 @@ fun UpdateDialog(
 
             if (downloading) {
                 Spacer(Modifier.height(16.dp))
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(50)),
-                    color = colors.accent,
-                    trackColor = colors.border,
-                )
+                if (totalBytes > 0) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(50)),
+                        color = colors.accent,
+                        trackColor = colors.border,
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(50)),
+                        color = colors.accent,
+                        trackColor = colors.border,
+                    )
+                }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "Mengunduh APK… ${(progress * 100).toInt()}%",
+                    text = buildString {
+                        append("Mengunduh APK…")
+                        if (totalBytes > 0) append(" ${(progress * 100).toInt()}%")
+                        append(" · ${Formatter.formatFileSize(context, downloadedBytes)}")
+                        if (totalBytes > 0) {
+                            append(" / ${Formatter.formatFileSize(context, totalBytes)}")
+                        }
+                    },
                     color = colors.textSecondary,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -131,26 +174,30 @@ fun UpdateDialog(
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = {
+                    if (downloading) return@Button
+                    error = null
+                    downloadedBytes = 0L
+                    totalBytes = -1L
                     if (!ApkDownloader.isApkUrl(release.downloadUrl)) {
-                        openUpdateUrl(context, release.downloadUrl)
-                        onDismiss()
+                        error = "Asset APK tidak ditemukan di rilis ini."
                         return@Button
                     }
                     downloading = true
-                    error = null
-                    progress = 0f
                     scope.launch {
                         try {
                             val file = ApkDownloader.download(
                                 context = context,
                                 url = release.downloadUrl,
                                 version = release.version,
-                                onProgress = { progress = it },
+                                onProgress = { downloaded, total ->
+                                    downloadedBytes = downloaded
+                                    totalBytes = total
+                                },
                             )
                             ApkDownloader.install(context, file)
                             onDismiss()
                         } catch (e: Exception) {
-                            error = "Gagal mengunduh APK. Cek koneksi internet, ya."
+                            error = "Unduh gagal. Cek koneksi internet, ya."
                         } finally {
                             downloading = false
                         }
@@ -167,16 +214,37 @@ fun UpdateDialog(
                 ),
             ) {
                 Text(
-                    text = if (downloading) "Mengunduh…" else "Perbarui",
-                    fontWeight = FontWeight.SemiBold,
+                    text = when {
+                        downloading -> "Mengunduh…"
+                        error != null -> "Coba Lagi"
+                        else -> "Perbarui Langsung"
+                    },
+                    fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                 )
             }
-            TextButton(
-                onClick = onDismiss,
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    openUpdateUrl(
+                        context,
+                        release.releaseUrl.ifBlank { UpdateChecker.FALLBACK_RELEASE_URL },
+                    )
+                },
                 enabled = !downloading,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, colors.border),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = colors.textPrimary,
+                    disabledContentColor = colors.textSecondary,
+                ),
             ) {
-                Text("Nanti", color = colors.textSecondary, fontSize = 13.sp)
+                Text(
+                    text = "Buka di GitHub",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                )
             }
         }
     }
@@ -203,7 +271,7 @@ private fun BoxChangelog(changelog: String) {
     }
 }
 
-/** Buka halaman rilis di browser kalau asset bukan APK langsung; gagal senyap. */
+/** Buka halaman rilis di browser; fallback senyap kalau tidak ada aplikasi browser. */
 fun openUpdateUrl(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))

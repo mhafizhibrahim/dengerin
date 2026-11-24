@@ -2,6 +2,7 @@ package com.dengerin.app.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dengerin.app.data.artist.ArtistImageRepository
 import com.dengerin.app.data.db.LocalPlaylistEntity
 import com.dengerin.app.data.extractor.MusicExtractorRepository
 import com.dengerin.app.data.model.Song
@@ -16,12 +17,14 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 data class ArtistItem(
     val name: String,
+    /** Fallback berupa thumbnail lagu saat foto profil tidak tersedia. */
     val thumbnailUrl: String,
+    /** Foto wajah asli dari Deezer. */
+    val imageUrl: String = "",
     val fromLibrary: Boolean = false,
 )
 
@@ -35,18 +38,25 @@ data class HomeUiState(
     val chill: List<Song> = emptyList(),
     val artists: List<ArtistItem> = emptyList(),
     val catalogError: String? = null,
+    val selectedMood: String = "Semua",
+    val moodRecommendations: List<Song> = emptyList(),
+    val isLoadingMood: Boolean = false,
 )
 
 class HomeViewModel(
     private val library: LibraryRepository,
     private val extractor: MusicExtractorRepository,
+    private val artistImages: ArtistImageRepository,
 ) : ViewModel() {
 
     private val remote = MutableStateFlow(RemoteCatalog())
-    private val artistThumbnails = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val artistImageUrls = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val moodState = MutableStateFlow(MoodSelection())
 
-    /** Cache memori agar avatar artis tidak di-fetch ulang tiap recomposisi/buka tab. */
-    private val artistThumbnailMemory = ConcurrentHashMap<String, String>()
+    /** Cache memori per mood supaya pindah chip terasa instan. */
+    private val moodMemory = ConcurrentHashMap<String, List<Song>>()
+    private val loadingMoods = ConcurrentHashMap.newKeySet<String>()
+    private val requestedArtists = ConcurrentHashMap.newKeySet<String>()
 
     private val librarySnapshot: StateFlow<LibrarySnapshot> = combine(
         library.history,
@@ -61,8 +71,9 @@ class HomeViewModel(
     val uiState: StateFlow<HomeUiState> = combine(
         librarySnapshot,
         remote,
-        artistThumbnails,
-    ) { snapshot, remoteCatalog, thumbs ->
+        artistImageUrls,
+        moodState,
+    ) { snapshot, remoteCatalog, imageUrls, mood ->
         HomeUiState(
             isLoadingCatalog = remoteCatalog.loading,
             history = snapshot.history,
@@ -71,14 +82,17 @@ class HomeViewModel(
             playlists = snapshot.playlists,
             hits = remoteCatalog.hits,
             chill = remoteCatalog.chill,
-            artists = buildArtists(snapshot.history, snapshot.liked, snapshot.playlistSongs, thumbs),
+            artists = buildArtists(snapshot.history, snapshot.liked, snapshot.playlistSongs, imageUrls),
             catalogError = remoteCatalog.error,
+            selectedMood = mood.mood,
+            moodRecommendations = mood.songs,
+            isLoadingMood = mood.loading,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     init {
         refreshCatalog()
-        prefetchArtistThumbnails()
+        observeArtistImages()
     }
 
     fun refreshCatalog() {
@@ -97,39 +111,66 @@ class HomeViewModel(
         }
     }
 
-    private fun prefetchArtistThumbnails() {
+    /**
+     * Ambil foto wajah artis yang tampil di rak (riwayat/playlist + bawaan).
+     * Pemanggilan Deezer cukup sekali per nama artis berkat cache repository + [requestedArtists].
+     */
+    private fun observeArtistImages() {
         viewModelScope.launch {
-            BUILT_IN_ARTISTS.chunked(4).forEach { batch ->
-                batch.map { name ->
-                    async(Dispatchers.IO) {
-                        name to fetchArtistThumbnail(name)
-                    }
-                }.awaitAll().forEach { (name, thumbnail) ->
-                    if (thumbnail.isNotBlank()) {
-                        artistThumbnailMemory[name] = thumbnail
-                        artistThumbnails.update { current -> current + (name to thumbnail) }
-                    }
+            librarySnapshot.collect { snapshot ->
+                val names = buildList {
+                    addAll(snapshot.history.map { it.artist })
+                    addAll(snapshot.playlistSongs.map { it.artist })
+                    addAll(snapshot.liked.map { it.artist })
+                    addAll(BUILT_IN_ARTISTS)
                 }
+                    .map(::cleanArtistName)
+                    .filter { it.isNotBlank() }
+                    .distinctBy { it.lowercase() }
+                    .take(10)
+
+                names.filter { requestedArtists.add(it.lowercase()) }
+                    .map { name -> async(Dispatchers.IO) { name to artistImages.getImageUrl(name) } }
+                    .awaitAll()
+                    .forEach { (name, url) ->
+                        if (url.isNotBlank()) {
+                            artistImageUrls.update { current -> current + (name.lowercase() to url) }
+                        }
+                    }
             }
         }
     }
 
-    private suspend fun fetchArtistThumbnail(name: String): String = withContext(Dispatchers.IO) {
-        runCatching {
-            extractor.searchSongs(name)
-                .getOrNull()
-                .orEmpty()
-                .firstOrNull { it.thumbnailUrl.isNotBlank() }
-                ?.thumbnailUrl
-                .orEmpty()
-        }.getOrDefault("")
+    /** Chip mood: langsung pakai cache bila sudah pernah dimuat. */
+    fun selectMood(mood: String) {
+        val cached = moodMemory[mood]
+        moodState.update {
+            MoodSelection(
+                mood = mood,
+                songs = cached.orEmpty(),
+                loading = mood != "Semua" && cached == null,
+            )
+        }
+        if (mood == "Semua" || cached != null || !loadingMoods.add(mood)) return
+
+        viewModelScope.launch {
+            val songs = runCatching {
+                MOOD_QUERIES[mood].orEmpty()
+                    .let { query -> extractor.searchSongs(query).getOrNull().orEmpty().take(12) }
+            }.getOrDefault(emptyList())
+            moodMemory[mood] = songs
+            loadingMoods.remove(mood)
+            if (moodState.value.mood == mood) {
+                moodState.update { it.copy(songs = songs, loading = false) }
+            }
+        }
     }
 
     private fun buildArtists(
         history: List<Song>,
         liked: List<Song>,
         playlistSongs: List<Song>,
-        thumbnails: Map<String, String>,
+        imageUrls: Map<String, String>,
     ): List<ArtistItem> {
         val result = mutableListOf<ArtistItem>()
         val seen = HashSet<String>()
@@ -141,6 +182,7 @@ class HomeViewModel(
                 result += ArtistItem(
                     name = name,
                     thumbnailUrl = thumbnailUrl,
+                    imageUrl = imageUrls[name.lowercase()].orEmpty(),
                     fromLibrary = true,
                 )
             }
@@ -154,7 +196,8 @@ class HomeViewModel(
             if (seen.add(name.lowercase())) {
                 result += ArtistItem(
                     name = name,
-                    thumbnailUrl = thumbnails[name].orEmpty(),
+                    thumbnailUrl = "",
+                    imageUrl = imageUrls[name.lowercase()].orEmpty(),
                     fromLibrary = false,
                 )
             }
@@ -182,7 +225,21 @@ class HomeViewModel(
         val error: String? = null,
     )
 
+    private data class MoodSelection(
+        val mood: String = "Semua",
+        val songs: List<Song> = emptyList(),
+        val loading: Boolean = false,
+    )
+
     private companion object {
+        val MOOD_QUERIES = linkedMapOf(
+            "Santai" to "lagu santai indonesia akustik",
+            "Semangat" to "lagu semangat indonesia upbeat",
+            "Fokus" to "lagu instrumental fokus belajar",
+            "Perjalanan" to "lagu perjalanan roadtrip indonesia",
+            "Galau" to "lagu galau sedih indonesia",
+        )
+
         val BUILT_IN_ARTISTS = listOf(
             "Tulus",
             "Bernadya",

@@ -21,11 +21,15 @@ object ApkDownloader {
 
     fun apkFileName(version: String): String = "Dengerin-v$version.apk"
 
+    /**
+     * @param onProgress bytes yang sudah diunduh dan total bytes (-1 bila tidak diketahui),
+     * dipanggil di Dispatchers.Main supaya aman langsung memperbarui UI.
+     */
     suspend fun download(
         context: Context,
         url: String,
         version: String,
-        onProgress: (Float) -> Unit,
+        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit,
     ): File = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
         val directory = File(context.cacheDir, "updates").apply { mkdirs() }
@@ -54,16 +58,13 @@ object ApkDownloader {
                     while (input.read(buffer).also { bytesRead = it } != -1) {
                         output.write(buffer, 0, bytesRead)
                         downloaded += bytesRead
-                        if (total > 0) {
-                            val fraction = (downloaded.toFloat() / total.toFloat()).coerceIn(0f, 1f)
-                            withContext(Dispatchers.Main) { onProgress(fraction) }
-                        }
+                        withContext(Dispatchers.Main) { onProgress(downloaded, total.toLong()) }
                     }
                     output.flush()
                 }
             }
             if (!target.exists() || target.length() == 0L) throw IOException("APK kosong")
-            withContext(Dispatchers.Main) { onProgress(1f) }
+            withContext(Dispatchers.Main) { onProgress(target.length(), total.toLong()) }
             target
         } catch (e: Exception) {
             target.delete()

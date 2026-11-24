@@ -120,3 +120,61 @@ Ciri khas Dengerin yang **tidak boleh hilang**:
   berikutnya `alpha 0.72`; fade di tepi atas/bawah daftar.
 - Kontrol sinkronisasi (`±0.5s`) dan tombol `Kembali ke lirik` memakai surface putih
   semi-transparan, bukan aksen hijau, supaya tidak menambah warna baru.
+
+## Fase 3 — Profil Opsional (Login Google, Level & Kosmetik)
+
+Login Google **opsional**. Beranda, pemutaran, pencarian, dan koleksi tetap penuh tanpa
+akun. Profil hanya dibuka lewat ikon di kanan atas Beranda.
+
+### Pengecualian efek
+
+Selain gradien sampul pada *Now Playing* / *Detail Playlist*, **satu-satunya tempat yang
+boleh memakai gradient+sweep berputar dan glow adalah bingkai avatar serta pita title di
+layar Profil** (dan pratinjau kecil bingkai di Beranda). Glow dibuat dari concentric stroke
+dengan alpha rendah, bukan blur berlebih, dan tidak boleh bocor ke kartu/header lain.
+
+### Token kosmetik profil
+
+Semua warna di bawah didefinisikan di `core/theme/Color.kt` sebagai
+`DengerinColors.cosmetics`, dibaca lewat `LocalDengerinColors.current`. Nilainya sama di
+tema gelap dan terang supaya identitas level konsisten.
+
+| Token kosmetik | Hex | Dipakai |
+| --- | --- | --- |
+| emerald | `#1ED760` | Bingkai Lv. 3, Music Lover, Playlist Maker (aksen utama) |
+| cyberBlue / cyberCyan | `#0088FF` / `#00F0FF` | Bingkai Lv. 7, Audiophile |
+| amethyst / magenta | `#9D4EDD` / `#FF2A85` | Bingkai Lv. 12, Heavy Rotation |
+| gold / amber | `#FFD700` / `#FF7B00` | Bingkai Lv. 20, Music Legend |
+| cosmicViolet / cosmicRose / cosmicTeal | `#9D4EDD` / `#FF2A85` / `#00F0FF` | Bingkai Lv. 35, Maestro |
+| twilightOrange / twilightPurple | `#FF9F45` / `#9D4EDD` | Chill Vibes |
+| nightBlue / nightIndigo | `#0B3D91` / `#1B2A6B` | Night Owl |
+| slate | `#27313D` | New Listener & frame default (memakai token `border`) |
+| creatorBlack / creatorGold / creatorNeon | `#05080B` / `#8A6A12` / `#0B7F3B` | Title eksklusif `creator_dev` |
+
+Progress XP, lencana aktif, dan tombol utama tetap memakai `accent #1ED760`. Teks di atas
+gradien kosmetik wajib putih (`textPrimary` di tema gelap) atau kontras dengan token
+`onAccent` lokal pada komponen ribbon.
+
+## Fase 4 — Developer & Testing Panel
+
+Akses khusus hanya untuk `ibrahimhafiz840@gmail.com` (pembandingan case-insensitive). Panel
+tidak boleh dirender, dibuka, atau dipanggil lewat repository untuk email lain. Pemeriksaan UI
+hanya kenyamanan; aturan Firestore tetap menjadi pagar akhir.
+
+### Lencana DEV & Title Creator
+
+- Lencana `DEV` memakai ikon `</>`, teks `DEV`, dan pill gradien `emerald → cyberCyan →
+  emerald`. Teks memakai `background` supaya kontras di atas neon.
+- Lencana muncul di samping pita nama pada kartu profil dan sebagai badge ringkas di avatar
+  Beranda. Tidak boleh dipakai sebagai dekorasi akun lain.
+- Title eksklusif `creator_dev` ("Creator") hanya masuk katalog dan hanya bisa dipakai akun
+  developer. Gradiennya memakai token `creatorBlack`, `creatorGold`, dan `creatorNeon` agar
+  tetap terbaca dengan teks putih.
+
+### Panel testing
+
+Kartu **Developer Panel** memakai border `accent #1ED760`, tidak elevation, dan hanya muncul
+di layar Profil milik developer. Dua aksinya: ubah level diri sendiri (simpan ke cache lokal
+lalu `users/{uid}`) dan ubah `totalXp` pengguna lain dari hasil pencarian `users`. Input level
+dibatasi `1–999`; konversi memakai `xpForLevel(level) = (level - 1)² × 40`.
+

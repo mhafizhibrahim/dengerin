@@ -64,13 +64,14 @@ Ganti tema langsung berubah, tanpa animasi atau layer penutup layar.
 | 🔗 **Impor Spotify** | Tempel link playlist publik—tanpa login, tanpa izin khusus. |
 | 🌗 **Tema instan** | Pilih **Sistem / Gelap / Terang** dari tab Koleksi; langsung berubah seketika. |
 | 🔄 **Auto-update** | Cek rilis baru dari GitHub saat aplikasi dibuka, plus tombol **Cek Pembaruan** manual. |
+| 👤 **Profil opsional** | Masuk dengan Google untuk level, XP, bingkai, dan title—Beranda & pemutaran tetap penuh tanpa akun. |
 
 > Catatan: lirik diambil dari layanan lirik publik (Lrclib). Ketersediaan lirik tergantung lagu.
 
 ## 📥 Unduh & pasang
 
 1. Buka halaman [GitHub Releases](https://github.com/mhafizhibrahim/dengerin/releases/latest).
-2. Unduh **`Dengerin-v1.1.1.apk`** (atau versi terbaru yang tersedia).
+2. Unduh **`Dengerin-v1.2.0.apk`** (atau versi terbaru yang tersedia).
 3. Buka file APK di HP dan pilih **Instal**.
 4. Minimal Android **8.0 (API 26)**.
 
@@ -121,6 +122,13 @@ Setiap rilis baru dilakukan berurutan supaya updater dan dokumen tetap sinkron:
 4. Build `assembleRelease`, lalu unggah APK dengan nama `Dengerin-vX.Y.Z.apk` ke GitHub Release.
 5. Pastikan `gh api repos/mhafizhibrahim/dengerin/releases/latest --jq .tag_name`
    mengembalikan tag rilis tersebut.
+
+### v1.2.0
+
+- **Profil opsional**: masuk dengan Google untuk level, XP, bingkai, dan title kosmetik. Semua fitur utama tetap bisa dipakai tanpa akun.
+- **Beranda lebih hidup**: chip suasana hati dan rak artis untuk menemukan lagu lebih cepat.
+- **Back HP mengikuti riwayat**: dari Lirik penuh kembali ke Sedang Diputar, lalu ke playlist asal, ke Koleksi, dan akhirnya ke Beranda. Back dari tab Cari/Koleksi kini kembali ke Beranda, bukan keluar aplikasi.
+- **Panel DEV**: pengaturan level/XP khusus akun developer, dengan aturan akses yang sama seperti Firestore.
 
 ### v1.1.1
 
@@ -204,4 +212,4 @@ R8/minify sengaja dimatikan, mengikuti konfigurasi proyek Sisihin yang sudah sta
 
 ---
 
-Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.1.1**.
+Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.2.0**.
