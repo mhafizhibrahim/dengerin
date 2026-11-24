@@ -110,6 +110,18 @@ APK hanya disimpan di cache aplikasi sendiri.
 
 ## 📝 Catatan rilis
 
+### Checklist rilis
+
+Setiap rilis baru dilakukan berurutan supaya updater dan dokumen tetap sinkron:
+
+1. Naikkan `versionCode` dan `versionName` di `app/build.gradle.kts`.
+2. Tambahkan catatan versi di bawah ini (versi terbaru paling atas) dan perbarui kalimat
+   "Versi terbaru saat README ini ditulis" di bagian paling bawah.
+3. `commit` + `push` ke `main`.
+4. Build `assembleRelease`, lalu unggah APK dengan nama `Dengerin-vX.Y.Z.apk` ke GitHub Release.
+5. Pastikan `gh api repos/mhafizhibrahim/dengerin/releases/latest --jq .tag_name`
+   mengembalikan tag rilis tersebut.
+
 ### v1.1.0
 
 - Layar **Cari** tidak lagi bertabrakan dengan status bar; search bar 52dp dengan border hijau saat fokus.
