@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sama dengan DESIGN_RULES.md dark background. -->
+    <color name="window_background">#0C1014</color>
+    <color name="accent">#1ED760</color>
+</resources>

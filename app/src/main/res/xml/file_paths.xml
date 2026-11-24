@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Hanya APK unduhan update yang dibagikan ke installer sistem. -->
+    <cache-path
+        name="update_apks"
+        path="updates/" />
+</paths>

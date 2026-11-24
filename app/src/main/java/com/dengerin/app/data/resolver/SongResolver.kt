@@ -1,0 +1,164 @@
+package com.dengerin.app.data.resolver
+
+import com.dengerin.app.core.isYouTubeImage
+import com.dengerin.app.core.upgradeThumbnailUrl
+import com.dengerin.app.core.youtubeThumbnailUrl
+import com.dengerin.app.data.db.DengerinDao
+import com.dengerin.app.data.db.SpotifyMatchCacheEntity
+import com.dengerin.app.data.extractor.MusicExtractorRepository
+import com.dengerin.app.data.model.Song
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * Jembatan Spotify → YouTube.
+ *
+ * Cek cache Room dulu, lalu cari di YouTube dan pilih hasil dengan kemiripan
+ * judul/artis tertinggi serta selisih durasi terdekat. Setelah cocok, sampul
+ * sementara Spotify di Room diganti thumbnail HD YouTube.
+ */
+class SongResolver(
+    private val extractor: MusicExtractorRepository,
+    private val dao: DengerinDao,
+) {
+
+    suspend fun resolve(song: Song): Result<Song> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (song.url.isNotBlank()) return@runCatching song
+
+            val key = song.spotifyId.ifBlank { "${song.title}|${song.artist}" }
+            dao.match(key)?.let { cached ->
+                val resolved = song.withYouTubeUrl(cached.youtubeVideoUrl)
+                persistResolvedThumbnail(song, resolved)
+                return@runCatching resolved
+            }
+
+            val candidates = extractor
+                .searchSongs("${song.title} ${song.artist}")
+                .getOrElse { throw IllegalStateException("Gagal mencari lagu di YouTube: ${it.message}") }
+            if (candidates.isEmpty()) throw IllegalStateException("Lagu ini belum ketemu di YouTube.")
+
+            val best = candidates.maxByOrNull { candidate ->
+                score(song, candidate)
+            } ?: throw IllegalStateException("Lagu ini belum ketemu di YouTube.")
+
+            dao.saveMatch(
+                SpotifyMatchCacheEntity(
+                    spotifyTrackId = key,
+                    youtubeVideoUrl = best.url,
+                    title = song.title,
+                    artist = song.artist,
+                    durationMs = song.durationMs,
+                ),
+            )
+            val resolved = song.withYouTubeUrl(best.url, best.thumbnailUrl)
+            persistResolvedThumbnail(song, resolved)
+            resolved
+        }
+    }
+
+    /**
+     * Dipakai saat impor: semua lagu dicocokkan sekaligus dengan konkurensi
+     * terbatas. Satu lagu gagal tidak membatalkan impor; ia tetap memakai cover
+     * playlist sebagai fallback. Progres dikirim per lagu yang selesai.
+     */
+    suspend fun resolveAll(
+        songs: List<Song>,
+        onProgress: ((done: Int, total: Int) -> Unit)? = null,
+    ): Result<List<Song>> = withContext(Dispatchers.IO) {
+        runCatching<List<Song>> {
+            if (songs.isEmpty()) return@runCatching emptyList()
+            val permits = Semaphore(IMPORT_CONCURRENCY)
+            val finished = AtomicInteger(0)
+            coroutineScope {
+                songs.map { song ->
+                    async(Dispatchers.IO) {
+                        permits.withPermit {
+                            val resolved: Song = runCatching { resolve(song).getOrThrow() }.getOrDefault(song)
+                            onProgress?.invoke(finished.incrementAndGet(), songs.size)
+                            resolved
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
+    }
+
+    /** Pakai gambar hasil pencarian YouTube, atau turunkan dari ID video bila kosong. */
+    private fun Song.withYouTubeUrl(url: String, youtubeThumbnail: String = ""): Song = copy(
+        id = url,
+        url = url,
+        durationMs = if (durationMs > 0) durationMs else 0L,
+        thumbnailUrl = listOf(youtubeThumbnail, youtubeThumbnailUrl(url))
+            .firstOrNull { isYouTubeImage(it) }
+            ?.let { upgradeThumbnailUrl(it) }
+            ?: thumbnailUrl,
+        source = "YOUTUBE",
+    )
+
+    /** Sampul asli langsung tampil di Beranda, Koleksi, dan Detail Playlist. */
+    private suspend fun persistResolvedThumbnail(original: Song, resolved: Song) {
+        val thumbnail = resolved.thumbnailUrl
+            .takeIf { isYouTubeImage(it) }
+            ?.let { upgradeThumbnailUrl(it) }
+            ?: return
+        val spotifyId = original.spotifyId.ifBlank { original.id }
+
+        dao.updateHistoryThumbnail(
+            videoUrl = resolved.url,
+            spotifyId = spotifyId,
+            thumbnailUrl = thumbnail,
+        )
+        dao.updatePlaylistTrackResolved(
+            videoUrl = resolved.url,
+            spotifyId = spotifyId,
+            thumbnailUrl = thumbnail,
+        )
+        dao.updateLikedSongThumbnail(
+            songId = spotifyId,
+            videoUrl = resolved.url,
+            spotifyId = spotifyId,
+            thumbnailUrl = thumbnail,
+        )
+    }
+
+    private fun score(target: Song, candidate: Song): Double {
+        val titleScore = similarity(normalize(target.title), normalize(candidate.title))
+        val artistScore = similarity(normalize(target.artist), normalize(candidate.artist))
+        val durationScore = when {
+            target.durationMs <= 0 || candidate.durationMs <= 0 -> 0.5
+            else -> {
+                val diff = kotlin.math.abs(target.durationMs - candidate.durationMs)
+                1.0 - (diff.toDouble() / target.durationMs.toDouble()).coerceIn(0.0, 1.0)
+            }
+        }
+        return titleScore * 0.6 + artistScore * 0.3 + durationScore * 0.1
+    }
+
+    private fun similarity(a: String, b: String): Double {
+        if (a.isBlank() || b.isBlank()) return 0.0
+        if (a == b) return 1.0
+        if (a.contains(b) || b.contains(a)) return 0.9
+        val tokensA = a.split(' ').filter { it.length > 1 }.toSet()
+        val tokensB = b.split(' ').filter { it.length > 1 }.toSet()
+        if (tokensA.isEmpty() || tokensB.isEmpty()) return 0.0
+        val intersection = tokensA.intersect(tokensB).size
+        return intersection.toDouble() / maxOf(tokensA.size, tokensB.size)
+    }
+
+    private fun normalize(value: String): String = value
+        .lowercase()
+        .replace(Regex("""[^a-z0-9\s]"""), " ")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+
+    private companion object {
+        const val IMPORT_CONCURRENCY = 4
+    }
+}

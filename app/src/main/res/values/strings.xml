@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dengerin</string>
+    <string name="tab_home">Beranda</string>
+    <string name="tab_search">Cari</string>
+    <string name="tab_collection">Koleksi</string>
+    <string name="search_placeholder">Cari lagu atau artis…</string>
+    <string name="now_playing">Sedang Diputar</string>
+</resources>

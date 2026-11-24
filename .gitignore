@@ -1,0 +1,23 @@
+# Artefak build
+build/
+.gradle/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Rahasia / signing
+local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# Distribusi
+*.apk
+*.aab
+*.zip
+
+# Tooling lokal
+.idea/
+*.iml
+.opencode/
