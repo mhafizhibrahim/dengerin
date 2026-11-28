@@ -11,13 +11,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
-import coil.ImageLoader
-import coil.request.ImageRequest
+import coil.imageLoader
+import com.dengerin.app.core.listImageRequest
 import com.dengerin.app.core.theme.LocalDengerinColors
-import com.dengerin.app.core.upgradeThumbnailUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.pow
@@ -45,13 +45,35 @@ fun rememberCoverGradient(imageUrl: String): State<Brush> {
 }
 
 /**
+ * Mini player memakai warna dominan sampul yang diredupkan: merah jadi marun, biru jadi
+ * biru tua, sampul abu jadi abu gelap. Ini pengecualian terbatas untuk mini player.
+ */
+@Composable
+fun rememberMiniPlayerTint(imageUrl: String): State<Color> {
+    val colors = LocalDengerinColors.current
+    val dominantRgb by rememberDominantRgb(imageUrl)
+    return remember(dominantRgb, colors) {
+        derivedStateOf {
+            // Gelap pekat & tidak tembus pandang: 65% hitam, 35% warna dominan sampul.
+            dominantRgb
+                ?.let { lerp(Color(it), colors.miniPlayerDark, 0.65f) }
+                ?: colors.miniPlayerDark
+        }
+    }
+}
+
+/**
  * Versi sedikit lebih berwarna untuk Detail Playlist: tetap diredupkan dan ditutup
  * dengan `#151B22` → `#0C1014` sesuai kontrak warna dinamis Dengerin.
  */
 @Composable
-fun rememberPlaylistCoverGradient(imageUrl: String): State<Brush> {
+fun rememberPlaylistCoverGradient(playlistId: String, imageUrl: String): State<Brush> {
     val colors = LocalDengerinColors.current
-    val dominantRgb by rememberDominantRgb(imageUrl)
+    // Kunci eksplisit: perubahan urutan/isi lagu tidak boleh mengulang Palette.
+    val dominantRgb by rememberDominantRgb(
+        imageUrl = imageUrl,
+        cacheKey = "playlist|$playlistId|$imageUrl",
+    )
 
     return remember(dominantRgb, colors) {
         derivedStateOf {
@@ -78,22 +100,27 @@ fun rememberAlbumColor(imageUrl: String): State<Color> {
 }
 
 @Composable
-private fun rememberDominantRgb(imageUrl: String): State<Int?> {
+private fun rememberDominantRgb(
+    imageUrl: String,
+    cacheKey: String = imageUrl,
+): State<Int?> {
     val context = LocalContext.current
     val dominant = remember { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(imageUrl) {
+    LaunchedEffect(cacheKey, imageUrl) {
         dominant.value = null
-        val hdUrl = upgradeThumbnailUrl(imageUrl)
-        if (hdUrl.isNullOrBlank()) return@LaunchedEffect
+        if (imageUrl.isBlank()) return@LaunchedEffect
         val rgb = withContext(Dispatchers.IO) {
             runCatching {
-                val request = ImageRequest.Builder(context)
-                    .data(hdUrl)
+                // Palette hanya butuh warna dominan: pakai thumbnail ringan dan
+                // ImageLoader global supaya tidak mengunduh ulang gambar yang sudah di-cache.
+                // allowHardware(false) wajib: bitmap hardware tidak bisa dibaca Palette.
+                val request = listImageRequest(context, imageUrl).newBuilder()
                     .allowHardware(false)
                     .build()
-                val drawable = ImageLoader.Builder(context).build().execute(request).drawable
+                val drawable = context.imageLoader.execute(request).drawable
                 val bitmap = (drawable as? BitmapDrawable)?.bitmap
+                    ?.takeIf { cover -> !cover.isRecycled }
                 bitmap?.let { cover ->
                     Palette.from(cover).generate().let { palette ->
                         (palette.vibrantSwatch ?: palette.dominantSwatch ?: palette.mutedSwatch)?.rgb

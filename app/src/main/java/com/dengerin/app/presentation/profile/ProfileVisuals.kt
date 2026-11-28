@@ -90,8 +90,11 @@ private val avatarBitmapCache = object : LruCache<String, Bitmap>(3 * 1024 * 102
 private fun decodeAvatarBase64(value: String?): Bitmap? {
     if (value.isNullOrBlank()) return null
     avatarBitmapCache.get(value)?.let { return it }
-    val bytes = Base64.decode(value, Base64.DEFAULT)
-    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+    // String Base64 di DataStore bisa korup; decode di dalam composition tidak
+    // boleh menjatuhkan seluruh layar Profil.
+    val bytes = runCatching { Base64.decode(value, Base64.DEFAULT) }.getOrNull() ?: return null
+    val bitmap = runCatching { BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }.getOrNull()
+        ?: return null
     avatarBitmapCache.put(value, bitmap)
     return bitmap
 }

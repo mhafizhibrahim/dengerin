@@ -5,4 +5,11 @@
         <item name="android:colorBackground">@color/window_background</item>
         <item name="android:windowLightStatusBar">false</item>
     </style>
+
+    <!-- Splash Android 12+ ala Spotify: latar gelap #121212, mark hijau di tengah. -->
+    <style name="Theme.Dengerin.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.Dengerin</item>
+    </style>
 </resources>

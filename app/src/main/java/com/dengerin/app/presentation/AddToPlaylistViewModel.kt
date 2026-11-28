@@ -1,5 +1,6 @@
 package com.dengerin.app.presentation
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dengerin.app.data.db.LocalPlaylistEntity
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Immutable
 data class PlaylistOption(
     val playlist: LocalPlaylistEntity,
     val songCount: Int,

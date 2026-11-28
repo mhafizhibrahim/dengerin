@@ -21,3 +21,5 @@ keystore.properties
 .idea/
 *.iml
 .opencode/
+__pycache__/
+*.pyc

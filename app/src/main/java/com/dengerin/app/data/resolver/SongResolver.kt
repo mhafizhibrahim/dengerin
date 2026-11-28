@@ -1,7 +1,9 @@
 package com.dengerin.app.data.resolver
 
+import com.dengerin.app.core.hdCoverUrl
 import com.dengerin.app.core.isYouTubeImage
-import com.dengerin.app.core.upgradeThumbnailUrl
+import com.dengerin.app.core.listThumbnailUrl
+import com.dengerin.app.core.youtubeListThumbnailUrl
 import com.dengerin.app.core.youtubeThumbnailUrl
 import com.dengerin.app.data.db.DengerinDao
 import com.dengerin.app.data.db.SpotifyMatchCacheEntity
@@ -28,6 +30,22 @@ class SongResolver(
     private val extractor: MusicExtractorRepository,
     private val dao: DengerinDao,
 ) {
+
+    /**
+     * Versi offline dari [resolve]: hanya membaca cache Room, TIDAK memanggil
+     * NewPipeExtractor. Dipakai sebelum memutuskan play dari SimpleCache penuh.
+     */
+    suspend fun resolveCached(song: Song): Song? = withContext(Dispatchers.IO) {
+        if (song.url.isNotBlank()) return@withContext song
+        val key = song.spotifyId.ifBlank { "${song.title}|${song.artist}" }
+        dao.match(key)?.let { cached ->
+            song.copy(
+                id = cached.youtubeVideoUrl,
+                url = cached.youtubeVideoUrl,
+                source = "YOUTUBE",
+            )
+        }
+    }
 
     suspend fun resolve(song: Song): Result<Song> = withContext(Dispatchers.IO) {
         runCatching {
@@ -102,22 +120,29 @@ class SongResolver(
     }
 
     /** Pakai gambar hasil pencarian YouTube, atau turunkan dari ID video bila kosong. */
-    private fun Song.withYouTubeUrl(url: String, youtubeThumbnail: String = ""): Song = copy(
-        id = url,
-        url = url,
-        durationMs = if (durationMs > 0) durationMs else 0L,
-        thumbnailUrl = listOf(youtubeThumbnail, youtubeThumbnailUrl(url))
+    private fun Song.withYouTubeUrl(url: String, youtubeThumbnail: String = ""): Song {
+        val source = listOf(youtubeThumbnail, youtubeListThumbnailUrl(url))
             .firstOrNull { isYouTubeImage(it) }
-            ?.let { upgradeThumbnailUrl(it) }
-            ?: thumbnailUrl,
-        source = "YOUTUBE",
-    )
+        val small = source?.let(::listThumbnailUrl).takeIf { !it.isNullOrBlank() }
+            ?: thumbnailUrl
+        val hd = source?.let(::hdCoverUrl)
+            ?: youtubeThumbnailUrl(url)
+            ?: coverUrl
+        return copy(
+            id = url,
+            url = url,
+            durationMs = if (durationMs > 0) durationMs else 0L,
+            thumbnailUrl = small,
+            coverUrl = hd,
+            source = "YOUTUBE",
+        )
+    }
 
-    /** Sampul asli langsung tampil di Beranda, Koleksi, dan Detail Playlist. */
+    /** Simpan versi ringan ke Room; cover HD diturunkan dari URL saat diputar. */
     private suspend fun persistResolvedThumbnail(original: Song, resolved: Song) {
         val thumbnail = resolved.thumbnailUrl
             .takeIf { isYouTubeImage(it) }
-            ?.let { upgradeThumbnailUrl(it) }
+            ?.let(::listThumbnailUrl)
             ?: return
         val spotifyId = original.spotifyId.ifBlank { original.id }
 

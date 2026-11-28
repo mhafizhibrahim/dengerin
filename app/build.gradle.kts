@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.aboutlibraries)
 }
 
 // Rahasia signing dibaca dari keystore.properties di root (di-gitignore).
@@ -33,8 +34,8 @@ android {
         applicationId = "com.dengerin.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -57,12 +58,21 @@ android {
     kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
+            // AGP 8.13 bawaan R8 belum membaca metadata Kotlin 2.4; turunkan
+            // metadata generasi ke 2.2 agar tidak ada warning rewriting saat dexing.
+            freeCompilerArgs.add("-Xmetadata-version=2.2.0")
         }
     }
 
     buildFeatures {
         compose = true
+        // VERSION_NAME / VERSION_CODE dipakai UI (Tentang Dengerin & dialog update).
+        buildConfig = true
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -81,6 +91,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    // Splash Android 12+ dan ikon notifikasi Media3 memakai aset vektor bermerek.
+    implementation(libs.androidx.core.splashscreen)
+
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
@@ -105,9 +118,14 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
 
-    // Media3: background playback + notifikasi & lockscreen.
+    // Animasi mikro (equalizer, + -> centang) dan pemindai lisensi otomatis saat compile.
+    implementation(libs.lottie.compose)
+    implementation(libs.aboutlibraries.core)
+
+    // Media3: background playback + notifikasi & lockscreen + SimpleCache.
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
+    implementation(libs.androidx.media3.datasource)
     implementation(libs.androidx.media3.datasource.okhttp)
 
     // Extractor + Downloader HTTP.

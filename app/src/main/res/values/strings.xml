@@ -1,9 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Dengerin</string>
-    <string name="tab_home">Beranda</string>
+    <string name="tab_home">Home</string>
     <string name="tab_search">Cari</string>
-    <string name="tab_collection">Koleksi</string>
+    <string name="tab_collection">Koleksi Kamu</string>
+    <string name="tab_create">Buat</string>
     <string name="search_placeholder">Cari lagu atau artis…</string>
     <string name="now_playing">Sedang Diputar</string>
+    <string name="action_like_add">Tambahkan ke Lagu Disukai</string>
+    <string name="action_like_remove">Hapus dari Lagu Disukai</string>
+    <string name="action_shuffle_on">Aktifkan Acak</string>
+    <string name="action_shuffle_off">Matikan Acak</string>
+
+    <string name="notification_channel_name">Pemutaran Dengerin</string>
+
+    <string name="shortcut_search_short">Cari Lagu</string>
+    <string name="shortcut_search_long">Cari lagu di Dengerin</string>
+    <string name="shortcut_liked_short">Lagu Disukai</string>
+    <string name="shortcut_liked_long">Buka Lagu Disukai</string>
+    <string name="shortcut_shuffle_short">Putar Acak</string>
+    <string name="shortcut_shuffle_long">Putar acak dari Lagu Disukai</string>
 </resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_search"
+        android:shortcutId="search_songs"
+        android:shortcutLongLabel="@string/shortcut_search_long"
+        android:shortcutShortLabel="@string/shortcut_search_short">
+        <intent
+            android:action="com.dengerin.app.action.SEARCH"
+            android:targetClass="com.dengerin.app.MainActivity"
+            android:targetPackage="com.dengerin.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_favorite"
+        android:shortcutId="liked_songs"
+        android:shortcutLongLabel="@string/shortcut_liked_long"
+        android:shortcutShortLabel="@string/shortcut_liked_short">
+        <intent
+            android:action="com.dengerin.app.action.LIKED"
+            android:targetClass="com.dengerin.app.MainActivity"
+            android:targetPackage="com.dengerin.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_shuffle"
+        android:shortcutId="shuffle_play"
+        android:shortcutLongLabel="@string/shortcut_shuffle_long"
+        android:shortcutShortLabel="@string/shortcut_shuffle_short">
+        <intent
+            android:action="com.dengerin.app.action.SHUFFLE"
+            android:targetClass="com.dengerin.app.MainActivity"
+            android:targetPackage="com.dengerin.app" />
+    </shortcut>
+</shortcuts>

@@ -29,6 +29,27 @@ service cloud.firestore {
       );
 
       allow delete: if false;
+
+      // Koleksi tanpa batas: metadata playlist, entri lagu (boleh duplikat), dan
+      // lagu disukai. Semua ditulis langsung oleh pemilik; Room tetap sumber lokal.
+      match /playlists/{playlistId} {
+        allow read: if isOwner(userId) || isDeveloper();
+        allow create, update: if isOwner(userId);
+        // Penghapusan permanen: pemilik boleh menghapus induk playlist ...
+        allow delete: if isOwner(userId);
+
+        match /tracks/{entryId} {
+          allow read: if isOwner(userId) || isDeveloper();
+          allow create, update: if isOwner(userId);
+          // ... dan seluruh entri lagunya (dihapus per potongan 400 dokumen).
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /liked_tracks/{trackId} {
+        allow read: if isOwner(userId) || isDeveloper();
+        allow create, update, delete: if isOwner(userId);
+      }
     }
   }
 }

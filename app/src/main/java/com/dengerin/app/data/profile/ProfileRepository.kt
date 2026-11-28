@@ -8,6 +8,7 @@ import android.media.ExifInterface
 import android.net.Uri
 import android.util.Base64
 import android.widget.Toast
+import com.dengerin.app.core.FirestoreIds
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -62,10 +63,14 @@ class ProfileRepository(context: Context) {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
             _authState.value = firebaseAuth.currentUser
         }
-        auth.addAuthStateListener(listener)
+        // Pendaftaran listener bisa gagal saat Firebase belum terinisialisasi (offline /
+        // proses awal). Jangan sampai itu membunuh Application.onCreate().
+        runCatching { auth.addAuthStateListener(listener) }
 
         scope.launch {
             _authState.collect { user ->
+                // hydrateForUser sengaja tidak menyentuh Firestore saat user null;
+                // semua jalur cloud juga dibungkus runCatching di dalamnya.
                 runCatching { hydrateForUser(user) }
             }
         }
@@ -79,7 +84,7 @@ class ProfileRepository(context: Context) {
                 ?: error("Akun Google tidak dapat dibaca. Coba lagi ya.")
             _authState.value = user
 
-            val remote = runCatching { fetchRemote(user.uid) }.getOrNull()
+            val remote = runCatching { fetchRemote(FirestoreIds.user(user.uid)) }.getOrNull()
             val local = preferences.profile.first()?.takeIf { it.uid == user.uid }
             // Email dari Auth selalu menang supaya Dev Panel memakai identitas aktif.
             val result = forIdentity(remote ?: local ?: newProfile(user), user.email)
@@ -93,20 +98,28 @@ class ProfileRepository(context: Context) {
     suspend fun refreshFromCloud(): Result<UserProfile> = withContext(Dispatchers.IO) {
         runCatching {
             val user = auth.currentUser ?: error("Belum masuk ke akun Google.")
-            val remote = fetchRemote(user.uid) ?: error("Profil cloud belum tersedia.")
+            val remote = fetchRemote(FirestoreIds.user(user.uid))
+                ?: error("Profil cloud belum tersedia.")
             mutationMutex.withLock { preferences.save(remote) }
             remote
         }
     }
 
     /** Edit profil/bingkai/title: simpan instan ke cache lalu sync sekali ini saja. */
-    suspend fun updateProfile(transform: (UserProfile) -> UserProfile) = withContext(Dispatchers.IO) {
-        mutationMutex.withLock {
-            val current = preferences.profile.first() ?: return@withLock
-            preferences.save(transform(current))
+    suspend fun updateProfile(transform: (UserProfile) -> UserProfile): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val local = runCatching {
+                mutationMutex.withLock {
+                    val current = preferences.profile.first() ?: return@withLock
+                    preferences.save(transform(current))
+                }
+            }
+            if (local.isFailure) {
+                Result.failure(local.exceptionOrNull() ?: IllegalStateException("Gagal menyimpan profil lokal."))
+            } else {
+                syncNow()
+            }
         }
-        syncNow()
-    }
 
     /**
      * Foto dari Android Photo Picker: crop 1:1, resize 256x256, JPEG kualitas 75–80,
@@ -151,42 +164,50 @@ class ProfileRepository(context: Context) {
      * PlayerController sudah memastikan ExoPlayer benar-benar playing.
      */
     suspend fun addListeningMinute() = withContext(Dispatchers.IO) {
-        if (auth.currentUser == null) return@withContext
-        var levelUp: Int? = null
+        runCatching {
+            if (auth.currentUser == null) return@runCatching
+            var levelUp: Int? = null
 
-        mutationMutex.withLock {
-            val current = preferences.profile.first() ?: return@withLock
-            val night = isNightTime()
-            val next = current.copy(
-                totalListeningSeconds = current.totalListeningSeconds + LISTENING_TICK_SECONDS,
-                totalXp = current.totalXp + XP_PER_MINUTE,
-                nightListeningMinutes = current.nightListeningMinutes + if (night) 1L else 0L,
-            )
-            preferences.save(next)
+            mutationMutex.withLock {
+                val current = preferences.profile.first() ?: return@withLock
+                val night = isNightTime()
+                val next = current.copy(
+                    totalListeningSeconds = current.totalListeningSeconds + LISTENING_TICK_SECONDS,
+                    totalXp = current.totalXp + XP_PER_MINUTE,
+                    nightListeningMinutes = current.nightListeningMinutes + if (night) 1L else 0L,
+                )
+                preferences.save(next)
 
-            val before = UserProfile.levelFromXp(current.totalXp)
-            val after = UserProfile.levelFromXp(next.totalXp)
-            if (after > before) levelUp = after
-            unsyncedListeningSeconds += LISTENING_TICK_SECONDS
-        }
-
-        val promotedLevel = levelUp
-        if (promotedLevel != null) {
-            withContext(Dispatchers.Main) {
-                Toast.makeText(appContext, "Naik ke Lv. $promotedLevel!", Toast.LENGTH_SHORT).show()
+                val before = UserProfile.levelFromXp(current.totalXp)
+                val after = UserProfile.levelFromXp(next.totalXp)
+                if (after > before) levelUp = after
+                unsyncedListeningSeconds += LISTENING_TICK_SECONDS
             }
-            syncNow()
-        } else if (unsyncedListeningSeconds >= SYNC_INTERVAL_SECONDS) {
-            syncNow()
+
+            val promotedLevel = levelUp
+            if (promotedLevel != null) {
+                withContext(Dispatchers.Main) {
+                    runCatching {
+                        Toast.makeText(appContext, "Naik ke Lv. $promotedLevel!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                syncNow()
+            } else if (unsyncedListeningSeconds >= SYNC_INTERVAL_SECONDS) {
+                syncNow()
+            }
         }
     }
 
     /** Hitung lagu yang benar-benar mulai diputar saat pengguna sedang login. */
     suspend fun recordSongPlayed() = withContext(Dispatchers.IO) {
-        if (auth.currentUser == null) return@withContext
-        mutationMutex.withLock {
-            val current = preferences.profile.first() ?: return@withLock
-            preferences.save(current.copy(totalSongsPlayed = current.totalSongsPlayed + 1))
+        // Dipanggil dari PlayerController tanpa runCatching di pemanggil, jadi
+        // kegagalan DataStore/Firestore harus berhenti di sini.
+        runCatching {
+            if (auth.currentUser == null) return@runCatching
+            mutationMutex.withLock {
+                val current = preferences.profile.first() ?: return@withLock
+                preferences.save(current.copy(totalSongsPlayed = current.totalSongsPlayed + 1))
+            }
         }
     }
 
@@ -216,7 +237,7 @@ class ProfileRepository(context: Context) {
             runCatching {
                 requireDeveloper(auth.currentUser?.email)
                 val needle = query.trim().lowercase(Locale.getDefault())
-                firestore.collection(COLLECTION_USERS)
+                firestore.collection(FirestoreIds.require(COLLECTION_USERS))
                     .orderBy(UserProfile.KEY_DISPLAY_NAME)
                     .limit(MAX_DEV_USERS)
                     .get()
@@ -243,10 +264,10 @@ class ProfileRepository(context: Context) {
     suspend fun setUserLevel(uid: String, level: Int): Result<Int> = withContext(Dispatchers.IO) {
         runCatching {
             requireDeveloper(auth.currentUser?.email)
-            require(uid.isNotBlank()) { "Pengguna tidak valid." }
+            val safeUid = FirestoreIds.user(uid)
             val targetLevel = level.coerceIn(MIN_DEV_LEVEL, MAX_DEV_LEVEL)
-            firestore.collection(COLLECTION_USERS)
-                .document(uid)
+            firestore.collection(FirestoreIds.require(COLLECTION_USERS))
+                .document(safeUid)
                 .set(
                     mapOf(UserProfile.KEY_XP to UserProfile.xpForLevel(targetLevel)),
                     SetOptions.merge(),
@@ -265,8 +286,8 @@ class ProfileRepository(context: Context) {
                 unsyncedListeningSeconds = 0L
                 return@runCatching Unit
             }
-            firestore.collection(COLLECTION_USERS)
-                .document(user.uid)
+            firestore.collection(FirestoreIds.require(COLLECTION_USERS))
+                .document(FirestoreIds.user(user.uid))
                 .set(snapshot.toFirestoreMap(), SetOptions.merge())
                 .await()
             unsyncedListeningSeconds = 0L
@@ -278,40 +299,52 @@ class ProfileRepository(context: Context) {
         val synced = syncNow()
         runCatching { auth.signOut() }
         _authState.value = null
-        mutationMutex.withLock {
-            preferences.clear()
-            unsyncedListeningSeconds = 0L
+        runCatching {
+            mutationMutex.withLock {
+                preferences.clear()
+                unsyncedListeningSeconds = 0L
+            }
         }
         synced
     }
 
     private suspend fun hydrateForUser(user: FirebaseUser?) {
         if (user == null) {
-            mutationMutex.withLock {
-                preferences.clear()
-                unsyncedListeningSeconds = 0L
+            // Tidak ada Firestore call saat logout/sesi belum ada.
+            runCatching {
+                mutationMutex.withLock {
+                    preferences.clear()
+                    unsyncedListeningSeconds = 0L
+                }
             }
             return
         }
+        if (auth.currentUser == null) return
         runCatching { syncEmail(user) }
 
         val local = preferences.profile.first()
         if (local?.uid == user.uid) {
             val withIdentity = forIdentity(local, user.email)
-            if (withIdentity != local) mutationMutex.withLock { preferences.save(withIdentity) }
+            if (withIdentity != local) {
+                runCatching { mutationMutex.withLock { preferences.save(withIdentity) } }
+            }
             return
         }
 
         // Perangkat baru / akun berganti: cloud yang menang, Google jadi fallback.
-        val remote = runCatching { fetchRemote(user.uid) }.getOrNull()
+        val remote = runCatching { fetchRemote(FirestoreIds.user(user.uid)) }.getOrNull()
         val initial = forIdentity(remote ?: newProfile(user), user.email)
-        mutationMutex.withLock { preferences.save(initial) }
+        runCatching { mutationMutex.withLock { preferences.save(initial) } }
     }
 
     private suspend fun fetchRemote(uid: String): UserProfile? {
-        val snapshot = firestore.collection(COLLECTION_USERS).document(uid).get().await()
+        val safeUid = FirestoreIds.user(uid)
+        val snapshot = firestore.collection(FirestoreIds.require(COLLECTION_USERS))
+            .document(safeUid)
+            .get()
+            .await()
         return if (snapshot.exists()) {
-            UserProfile.fromFirestoreMap(uid, snapshot.data.orEmpty())
+            UserProfile.fromFirestoreMap(safeUid, snapshot.data.orEmpty())
         } else {
             null
         }
@@ -342,8 +375,8 @@ class ProfileRepository(context: Context) {
     /** Email Auth ditulis ke dokumen sendiri pada setiap login / restore sesi. */
     private suspend fun syncEmail(user: FirebaseUser) {
         val email = user.email?.takeIf { it.isNotBlank() } ?: return
-        firestore.collection(COLLECTION_USERS)
-            .document(user.uid)
+        firestore.collection(FirestoreIds.require(COLLECTION_USERS))
+            .document(FirestoreIds.user(user.uid))
             .set(mapOf(UserProfile.KEY_EMAIL to email), SetOptions.merge())
             .await()
     }

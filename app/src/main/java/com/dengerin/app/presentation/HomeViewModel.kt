@@ -1,5 +1,6 @@
 package com.dengerin.app.presentation
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dengerin.app.data.artist.ArtistImageRepository
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 
+@Immutable
 data class ArtistItem(
     val name: String,
     /** Fallback berupa thumbnail lagu saat foto profil tidak tersedia. */
@@ -28,6 +30,7 @@ data class ArtistItem(
     val fromLibrary: Boolean = false,
 )
 
+@Immutable
 data class HomeUiState(
     val isLoadingCatalog: Boolean = true,
     val history: List<Song> = emptyList(),

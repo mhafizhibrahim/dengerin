@@ -5,7 +5,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -46,6 +45,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -84,6 +84,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.dengerin.app.core.theme.LocalBottomClearance
 import com.dengerin.app.core.theme.LocalDengerinColors
 import com.dengerin.app.data.profile.DeveloperUser
 import com.dengerin.app.data.profile.UserProfile
@@ -113,6 +114,8 @@ import java.util.Locale
 fun ProfileScreen(
     viewModel: ProfileViewModel,
     onClose: () -> Unit,
+    onOpenSettings: () -> Unit = {},
+    showBack: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -153,11 +156,20 @@ fun ProfileScreen(
             TopAppBar(
                 title = { Text("Profil", color = colors.textPrimary, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali", tint = colors.textPrimary)
+                    if (showBack) {
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali", tint = colors.textPrimary)
+                        }
                     }
                 },
                 actions = {
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = "Buka pengaturan",
+                            tint = colors.textSecondary,
+                        )
+                    }
                     if (state.isLoggedIn) {
                         IconButton(onClick = viewModel::refreshFromCloud, enabled = !state.isBusy) {
                             Icon(
@@ -245,7 +257,12 @@ private fun LoggedOutProfile(
     val colors = LocalDengerinColors.current
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 16.dp,
+            end = 16.dp,
+            bottom = LocalBottomClearance.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -253,7 +270,6 @@ private fun LoggedOutProfile(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.surface),
-                border = BorderStroke(1.dp, colors.border),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(
@@ -353,7 +369,6 @@ private fun ProfileBenefit(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = BorderStroke(1.dp, colors.border),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.Top) {
@@ -395,7 +410,12 @@ private fun LoggedInProfile(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = 16.dp,
+            end = 16.dp,
+            bottom = LocalBottomClearance.current,
+        ),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
@@ -403,7 +423,6 @@ private fun LoggedInProfile(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.surface),
-                border = BorderStroke(1.dp, colors.border),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -493,7 +512,6 @@ private fun LoggedInProfile(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(containerColor = colors.surface),
-                border = BorderStroke(1.dp, colors.border),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -552,7 +570,10 @@ private fun LoggedInProfile(
                 onClick = onEdit,
                 modifier = Modifier.fillMaxWidth().height(46.dp),
                 shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, colors.border),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = colors.surfaceElevated,
+                    contentColor = colors.textPrimary,
+                ),
             ) {
                 Icon(Icons.Filled.Edit, contentDescription = null, tint = colors.accent, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -603,7 +624,10 @@ private fun LoggedInProfile(
                     onClick = onOpenDeveloperPanel,
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, colors.accent),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = colors.accentSoftContainer,
+                        contentColor = colors.accent,
+                    ),
                 ) {
                     Icon(
                         Icons.Filled.Code,
@@ -631,7 +655,10 @@ private fun LoggedInProfile(
                 enabled = !isBusy,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, colors.error),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = colors.surfaceElevated,
+                    contentColor = colors.error,
+                ),
             ) {
                 Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = colors.error, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
@@ -666,7 +693,6 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = BorderStroke(1.dp, colors.border),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
@@ -690,8 +716,9 @@ private fun FrameChoice(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = BorderStroke(1.dp, if (selected) colors.accent else colors.border),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) colors.accentSoftContainer else colors.surface,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -740,8 +767,9 @@ private fun TitleChoice(
         onClick = onClick,
         modifier = modifier,
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
-        border = BorderStroke(1.dp, if (selected) colors.accent else colors.border),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) colors.accentSoftContainer else colors.surface,
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
@@ -832,7 +860,10 @@ private fun DeveloperPanelDialog(
                     listOf(1, 5, 10, 25, 50).forEach { preset ->
                         OutlinedButton(
                             onClick = { levelInput = preset.toString() },
-                            border = BorderStroke(1.dp, colors.border),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = colors.surfaceElevated,
+                                contentColor = colors.textPrimary,
+                            ),
                         ) {
                             Text("Lv. $preset", color = colors.textPrimary)
                         }
@@ -877,6 +908,7 @@ private fun DeveloperPanelDialog(
                 )
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+                    contentPadding = PaddingValues(bottom = LocalBottomClearance.current),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     items(state.developerUsers, key = { it.uid }) { user ->
@@ -1006,12 +1038,19 @@ private fun EditProfileDialog(
         containerColor = colors.surface,
         title = { Text("Edit Profil", color = colors.textPrimary, fontWeight = FontWeight.Bold) },
         text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = LocalBottomClearance.current),
+            ) {
                 OutlinedButton(
                     onClick = onPickPhoto,
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, colors.accent),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = colors.accentSoftContainer,
+                        contentColor = colors.accent,
+                    ),
                 ) {
                     Icon(
                         Icons.Filled.PhotoLibrary,

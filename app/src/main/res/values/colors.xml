@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Sama dengan DESIGN_RULES.md dark background. -->
-    <color name="window_background">#0C1014</color>
+    <color name="window_background">#121212</color>
     <color name="accent">#1ED760</color>
+
+    <!--
+      Warna identitas hasil sampling dengerin.jpg (bukan token aksen in-app).
+      turunan +8% memakai HSV Value x 1.08 -> #27E16D.
+    -->
+    <color name="dengerin_brand_green">#24D065</color>
+    <color name="dengerin_brand_green_lift">#27E16D</color>
+    <color name="dengerin_symbol">#141414</color>
 </resources>

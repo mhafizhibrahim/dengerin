@@ -5,8 +5,8 @@
 **Dengerin musikmu, tanpa drama.**
 
 Pemutar musik Android yang akrab dipakai, tapi bersih: gelap by default, mini player
-melayang, dan nol sampah UI. Cari lagu, simpan playlist, baca lirik langsung—tanpa perlu
-akun Spotify.
+terkunci di atas navigasi, dan nol sampah UI. Cari lagu, simpan playlist, baca lirik
+langsung—tanpa perlu akun Spotify.
 
 [📥 Unduh APK](https://github.com/mhafizhibrahim/dengerin/releases/latest) ·
 [📦 Semua rilis](https://github.com/mhafizhibrahim/dengerin/releases) ·
@@ -14,7 +14,7 @@ akun Spotify.
 
 [![Rilis terbaru](https://img.shields.io/github/v/release/mhafizhibrahim/dengerin?style=for-the-badge&color=1ED760)](https://github.com/mhafizhibrahim/dengerin/releases/latest)
 [![Total unduhan](https://img.shields.io/github/downloads/mhafizhibrahim/dengerin/total?style=for-the-badge&color=1ED760)](https://github.com/mhafizhibrahim/dengerin/releases)
-[![Bintang](https://img.shields.io/github/stars/mhafizhibrahim/dengerin?style=for-the-badge&color=1ED760)](https://github.com/mhafizhibrahim/dengerin/stargazers)
+[![Bintang](https://img.shields.io/github/stars/mhafizhibrahim/dengerin/stargazers)](https://github.com/mhafizhibrahim/dengerin/stargazers)
 ![Android](https://img.shields.io/badge/Android-8.0%2B-1ED760?style=for-the-badge)
 ![Stack](https://img.shields.io/badge/Kotlin%20%2B%20Jetpack%20Compose-1ED760?style=for-the-badge)
 
@@ -39,39 +39,40 @@ akun Spotify.
 Dengerin meminjam **struktur** yang sudah terasa akrab—header sapaan, pintasan, rak horizontal,
 mini player—tapi dengan identitas sendiri:
 
-- **Instagram Dark Slate** `#0C1014`, bukan hitam pekat atau abu kusam.
-- Kartu datar dengan border halus `1dp #27313D`, tanpa elevation/glow berlebihan.
-- Aksen hijau segar `#1ED760`, dipakai untuk status aktif dan tombol utama.
-- Mini player berupa *floating pill* dengan jarak `8dp` dari tepi.
-- **Nol sampah UI**: tanpa banner Premium, pop-up promosi, tab podcast/audiobook, atau iklan.
+- Gelap by default `#121212`, terang `#F4F6F8`; tanpa warna dinamis dari wallpaper.
+- Kartu datar tanpa bingkai dan tanpa elevation; pemisah cukup `Color.White.copy(0.08f)`.
+- Aksen hijau `#1ED760` (gelap) / `#1DB954` (terang), hanya untuk status aktif dan kontrol utama.
+- Mini player terkunci di atas navigasi.
+- **Nol sampah UI**: tanpa banner berlangganan, pop-up promosi, tab podcast/audiobook, atau iklan.
 
-Ganti tema langsung berubah, tanpa animasi atau layer penutup layar.
+Ganti tema langsung berubah, tanpa animasi atau lapisan penutup layar, dan hanya tersedia di
+**Pengaturan → Tampilan & Tema**.
 
 ## ✨ Fitur
 
 | Fitur | Apa yang kamu dapat |
 | --- | --- |
-| 🔎 **Cari & jelajah** | Cari lagu/artis, riwayat 5 kata kunci, 8 kategori musik, dan rak hashtag—semuanya langsung mencari lagu nyata. |
-| ➕ **Tambah ke playlist** | Dari hasil cari, detail playlist, Now Playing, atau mini player: buat playlist baru, simpan ke *Lagu Disukai*, atau kelola playlist lokal tanpa duplikat. |
-| 🎲 **True shuffle** | Acak seluruh antrean tanpa memotong lagu yang sedang berjalan; next/previous dan auto-advance mengikuti urutan acak. |
-| 🧑‍🎤 **Artis populer** | Rak avatar bulat di Beranda dari riwayat & playlist kamu, dilengkapi artis favorit; ketuk untuk langsung cari lagunya. |
-| ▶️ **Kontrol penuh** | Play/pause, next/previous, shuffle, repeat, dan slider *seek* yang bisa digeser. |
-| 🫧 **Mini player** | Melayang di atas navigasi, tetap terlihat saat kamu jelajah aplikasi. |
-| 💿 **Sedang Diputar** | Sampul besar, progres, tombol suka, shuffle, dan repeat dalam satu layar. |
-| 📝 **Live Lyrics** | Kartu lirik sinkron di bawah kontrol, bisa diperbesar ke layar penuh, lengkap dengan penyesuaian timing `±0.5s`. |
+| 🔎 **Cari & jelajah** | Cari lagu, artis, dan playlist dengan filter; riwayat penarian tersimpan, saran langsung muncul, dan hasil sudah melewati pemeriksaan relevansi. |
+| 🧑‍🎤 **Artis populer & profil artis** | Artis unggulan mudah ditemukan; halaman artis menampilkan lagu yang benar-benar dimiliki artis tersebut, bukan sekadar kemiripan nama. |
+| ▶️ **Putar hemat kuota** | Streaming on-demand. Prefetch lagu berikutnya **mati secara default (0 MB saat install)** dan hanya aktif di Wi-Fi tanpa Data Saver bila diaktifkan eksplisit. |
+| 🎧 **Kontrol penuh** | Play/pause, next/previous, shuffle, repeat, seek, serta kontrol dari notifikasi, lockscreen, dan tombol headset lewat Media3 `MediaSessionService`. |
+| 🫧 **Mini player** | Terkunci di atas navigasi dan tetap terlihat saat menjelajah aplikasi. |
+| 💿 **Sedang Diputar** | Sampul besar, progres, tombol suka, shuffle, repeat, antrean, dan info audio/cache dalam satu layar. |
+| 📝 **Live Lyrics** | Lirik sinkron dari LRCLIB/YTM dengan penyesuaian timing `±0.5s`, tampilan karaoke layar penuh, dan animasi ringan 60 FPS (transisi 90 ms). |
 | 💚 **Koleksi** | Lagu disukai, riwayat putar, playlist lokal, dan playlist baru dengan satu tombol. |
 | 📀 **Detail playlist** | Gradien sampul, cari & sortir di playlist, total durasi, tombol putar bundar, dan indikator shuffle. |
-| 🔗 **Impor Spotify** | Tempel link playlist publik—tanpa login, tanpa izin khusus. |
-| 🌗 **Tema instan** | Pilih **Sistem / Gelap / Terang** dari tab Koleksi; langsung berubah seketika. |
-| 🔄 **Auto-update** | Cek rilis baru dari GitHub saat aplikasi dibuka, plus tombol **Cek Pembaruan** manual. |
+| 🔗 **Impor playlist** | Tempel link playlist Spotify publik atau impor dari akun Spotify—tanpa izin khusus. Sinkronisasi Firestore berjalan saat aplikasi aktif dan dilepas saat background supaya hemat baterai. |
+| 🎨 **Identitas baru** | Ikon vektor Dengerin, Splash Screen Android 12+, dan App Shortcuts (Cari Lagu, Lagu Disukai, Putar Acak). |
+| 🌗 **Tema instan** | Pilih **Sistem / Gelap / Terang** dari **Pengaturan → Tampilan & Tema**; langsung berubah seketika. |
+| 🔄 **GitHub Auto-Updater** | Cek rilis terbaru otomatis saat aplikasi dibuka, plus tombol manual di **Pengaturan → Pembaruan → Periksa Pembaruan**. |
 | 👤 **Profil opsional** | Masuk dengan Google untuk level, XP, bingkai, dan title—Beranda & pemutaran tetap penuh tanpa akun. |
 
-> Catatan: lirik diambil dari layanan lirik publik (Lrclib). Ketersediaan lirik tergantung lagu.
+> Catatan: lirik berasal dari layanan publik (LRCLIB/YTM). Ketersediaan lirik tergantung lagu.
 
 ## 📥 Unduh & pasang
 
 1. Buka halaman [GitHub Releases](https://github.com/mhafizhibrahim/dengerin/releases/latest).
-2. Unduh **`Dengerin-v1.2.0.apk`** (atau versi terbaru yang tersedia).
+2. Unduh **`Dengerin-v1.3.0.apk`** (atau versi terbaru yang tersedia).
 3. Buka file APK di HP dan pilih **Instal**.
 4. Minimal Android **8.0 (API 26)**.
 
@@ -82,8 +83,7 @@ bisa menampilkan peringatan. Ini wajar. Pilih:
 
 **Detail selengkapnya → Tetap instal → Instal anyway**
 
-APK yang dirilis sudah ditandatangani dengan kunci release sendiri dan bisa diverifikasi dengan
-`apksigner verify`.
+APK dirilis dengan kunci release sendiri dan dapat diverifikasi dengan `apksigner verify`.
 
 ## 🔄 Pembaruan otomatis
 
@@ -94,7 +94,8 @@ background.
 - Kalau ada versi baru → muncul dialog berisi nomor versi, catatan rilis, progres unduh, tombol
   **Perbarui** dan **Nanti**.
 - Versi dibandingkan per segmen angka, jadi `1.0.10` dianggap lebih baru dari `1.0.2`.
-- Cek manual ada di **Koleksi → Cek Pembaruan**, lengkap dengan versi yang sedang terpasang.
+- Cek manual ada di **Pengaturan → Pembaruan → Periksa Pembaruan**, lengkap dengan versi yang
+  sedang terpasang.
 
 ### Izin instal
 
@@ -113,41 +114,25 @@ APK hanya disimpan di cache aplikasi sendiri.
 
 ### Checklist rilis
 
-Setiap rilis baru dilakukan berurutan supaya updater dan dokumen tetap sinkron:
-
 1. Naikkan `versionCode` dan `versionName` di `app/build.gradle.kts`.
-2. Tambahkan catatan versi di bawah ini (versi terbaru paling atas) dan perbarui kalimat
-   "Versi terbaru saat README ini ditulis" di bagian paling bawah.
-3. `commit` + `push` ke `main`.
-4. Build `assembleRelease`, lalu unggah APK dengan nama `Dengerin-vX.Y.Z.apk` ke GitHub Release.
-5. Pastikan `gh api repos/mhafizhibrahim/dengerin/releases/latest --jq .tag_name`
-   mengembalikan tag rilis tersebut.
+2. Perbarui catatan versi di bawah ini dan kalimat "Versi terbaru saat README ini ditulis".
+3. Jalankan `.\gradlew.bat testDebugUnitTest lintRelease assembleRelease --no-daemon`.
+4. Salin APK menjadi `Dengerin-vX.Y.Z.apk`, lalu commit, tag, dan push ke `origin`.
+5. Unggah APK + catatan rilis ke GitHub Release dan pastikan
+   `gh api repos/mhafizhibrahim/dengerin/releases/latest --jq .tag_name` mengembalikan tag tersebut.
 
-### v1.2.0
+### v1.3.0
 
-- **Profil opsional**: masuk dengan Google untuk level, XP, bingkai, dan title kosmetik. Semua fitur utama tetap bisa dipakai tanpa akun.
-- **Beranda lebih hidup**: chip suasana hati dan rak artis untuk menemukan lagu lebih cepat.
-- **Back HP mengikuti riwayat**: dari Lirik penuh kembali ke Sedang Diputar, lalu ke playlist asal, ke Koleksi, dan akhirnya ke Beranda. Back dari tab Cari/Koleksi kini kembali ke Beranda, bukan keluar aplikasi.
-- **Panel DEV**: pengaturan level/XP khusus akun developer, dengan aturan akses yang sama seperti Firestore.
+- **Rilis stabil**: `versionCode 5`, rantai migrasi Room `1→2→3→4→5` tanpa fallback destruktif, schema terekspor, dan 58 unit test hijau.
+- **Hemat kuota**: prefetch lagu berikutnya mati secara default (0 MB), retry jaringan bertahap 250→500→1000→2000 ms, dan pemutaran on-demand.
+- **Hemat baterai**: listener Firestore dilepas saat aplikasi ke background dan dipasang ulang saat foreground tanpa mengulang unggah.
+- **Pencarian & artis**: filter hasil, artis populer, dan validasi kepemilikan lagu pada profil artis.
+- **Kontrol pemutaran**: notifikasi, lockscreen, dan headset memakai Media3 `MediaSessionService`.
+- **Identitas & lirik**: ikon vektor baru, Splash Screen, App Shortcuts, dan lirik sinkron halus.
+- **UI lebih bersih**: kartu tanpa bingkai, tombol "Coba lagi" nyata pada error, token warna konsisten di dua tema, dan "Cari lagu" langsung membuka tab Pencarian.
+- **Build hijau**: `lintRelease` 0 error dan `testDebugUnitTest` lulus 100%. Toolchain tidak diubah.
 
-### v1.1.1
-
-- **Fix bugs**: scroll cepat di playlist 100 lagu tidak lagi *force close*. Key `LazyColumn` sekarang unik per indeks dan thumbnail didekode maksimal 144 px tanpa crossfade.
-- **Fix bugs**: auto-next saat Shuffle aktif kini benar-benar berputar. Antrean (`originalQueue` / `activeQueue` / `currentIndex`) dikelola penuh di `PlayerController`, termasuk `REPEAT_ONE`, wrap `REPEAT_ALL`, dan skip 3 kali bila ekstraksi gagal.
-- **Fix bugs**: thumbnail YouTube HD langsung tampil sejak impor. 10 lagu pertama disiapkan lebih dulu dengan progres di dialog, sisanya menyusul di worker latar belakang; cover playlist tidak lagi dipinjam sebagai sampul trek.
-
-### v1.1.0
-
-- Layar **Cari** tidak lagi bertabrakan dengan status bar; search bar 52dp dengan border hijau saat fokus.
-- Mode jelajah: riwayat penarian, 8 kategori musik, dan rak hashtag yang langsung mencari lagu.
-- Bottom sheet **Tambah ke playlist** tersedia di hasil cari, detail playlist, Now Playing, dan mini player.
-- Detail playlist bergaya Spotify: gradien sampul, cari & sortir, total durasi, play bundar, dan shuffle dengan indikator.
-- True shuffle: unduhan acak Fisher-Yates langsung diputar, sisa antrean diacak tanpa memotong lagu aktif.
-- Rak **Artis Untukmu** dengan avatar bulat; ketuk untuk membuka hasil pencarian artis tersebut.
-
-### v1.0.0
-
-- Rilis awal: pemutar latar belakang, lirik sinkron, koleksi lokal, impor playlist Spotify, dan auto-updater GitHub Releases.
+Untuk rilis sebelum `v1.3.0`, lihat [halaman Releases](https://github.com/mhafizhibrahim/dengerin/releases).
 
 ## 🛠 Build dari sumber
 
@@ -155,10 +140,10 @@ Butuh JDK 17, Android SDK 35, dan Gradle wrapper yang sudah disertakan.
 
 ```bash
 # Windows
-.\gradlew.bat assembleRelease
+.\gradlew.bat testDebugUnitTest lintRelease assembleRelease --no-daemon
 
 # macOS / Linux
-./gradlew assembleRelease
+./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon
 ```
 
 Hasil: `app/build/outputs/apk/release/app-release.apk`.
@@ -178,31 +163,39 @@ Kredensial signing sengaja **tidak** disimpan di repo. Untuk build release dari 
 3. Pastikan `keystore.properties`, `*.jks`, `*.keystore`, dan `local.properties` tidak pernah
    di-`commit` (sudah diabaikan oleh `.gitignore`).
 
-R8/minify sengaja dimatikan, mengikuti konfigurasi proyek Sisihin yang sudah stabil, supaya
-`NewPipeExtractor`, `Media3`, `Room`, dan `OkHttp` tidak ter-strip saat runtime.
+Toolchain dikunci di Kotlin `2.4.0`, KSP `2.3.14`, dan AGP `8.13.2`. R8/minify sengaja
+dinonaktifkan supaya `NewPipeExtractor`, `Media3`, `Room`, dan `OkHttp` tidak ter-strip saat
+runtime. Ketiganya tidak diubah di `v1.3.0`.
 
 ## 🧩 Arsitektur singkat
 
-- **UI**: Jetpack Compose + Material 3, satu `DengerinTheme` dengan token warna tetap di
-  `core/theme/Color.kt`.
-- **Navigasi**: `NavHost` dengan rute datar; tiga tab utama (`Beranda`, `Cari`, `Koleksi`)
-  memakai state index, bukan rute terpisah.
+- **UI**: Jetpack Compose + Material 3. Token warna tetap di `core/theme/Color.kt`, pembungkus di
+  `core/theme/Theme.kt`, dibaca lewat `LocalDengerinColors.current`.
+- **Navigasi**: `NavHost` dengan rute datar; empat tab (`Beranda`, `Cari`, `Koleksi`, `Buat`)
+  memakai state index. Tab `Buat` membuka sheet, bukan halaman.
 - **DI**: `AppContainer` manual—tanpa Hilt—supaya build tetap ringan.
-- **Pemutar**: Media3 ExoPlayer + `MusicPlaybackService` untuk pemutaran latar belakang.
-- **Sumber lagu**: NewPipeExtractor dengan downloader OkHttp khusus.
-- **Data lokal**: Room untuk lagu disukai, riwayat, dan playlist; DataStore untuk preferensi tema.
-- **Updater**: `UpdateChecker` + `ApkDownloader`, keduanya memakai API bawaan Android sehingga
-  tidak menambah dependency baru.
+- **Pemutar**: Media3 ExoPlayer + `DengerinPlaybackService` (`MediaSessionService` +
+  `ForwardingPlayer`) untuk latar belakang, notifikasi, lockscreen, dan headset. `PlayerController`,
+  `RetryBackoff`, `AudioCacheManager`, dan `PrefetchPolicy` mengatur antrean, retry, dan kuota.
+- **Sumber lagu**: NewPipeExtractor dengan downloader OkHttp terpusat.
+- **Data lokal**: Room versi 5 dengan rantai migrasi eksplisit dan schema terekspor; DataStore
+  untuk tema, kualitas audio, kuota, dan preferensi sinkronisasi.
+- **Sinkronisasi**: `LibraryCloudSync` memasang listener Firestore saat foreground dan melepaskannya
+  saat background melalui `ProcessLifecycleOwner`.
+- **Lirik**: LRCLIB/YTM dengan timeline berbasis snapshot agar posisi aktif berubah hanya saat
+  baris berganti.
+- **Updater**: `GitHubUpdateManager` (GitHub Releases API + unduhan APK) lewat facade
+  `UpdateChecker` / `ApkDownloader`; nama aset rilis `Dengerin-v<versi>.apk`.
 
 ## ❓ Troubleshooting
 
 | Masalah | Solusi |
 | --- | --- |
-| Play Protect bilang aplikasi berbahaya | Pilih **Detail selengkapnya → Tetap instal**. Pakai hanya APK dari halaman rilis resmi ini. |
+| Play Protect bilang aplikasi berbahaya | Pilih **Detail selengkapnya → Tetap instal → Instal anyway**. Pakai hanya APK dari halaman rilis resmi ini. |
 | Install update ditolak *update incompatible* | Ada Dengerin versi lain dengan tanda tangan berbeda. Uninstall yang lama lalu pasang ulang (data lama bisa hilang). |
-| *Cek Pembaruan* gagal | Cek koneksi internet. Cek otomatis sengaja diam bila GitHub tidak bisa dijangkau. |
+| *Periksa Pembaruan* gagal | Cek koneksi internet. Cek otomatis sengaja diam bila GitHub tidak bisa dijangkau. |
 | Tidak ada suara / playback berhenti | Izinkan notifikasi saat diminta agar layanan pemutaran latar belakang tetap jalan. |
-| Lirik tidak muncul | Tidak semua lagu punya lirik di Lrclib. Coba lagu lain atau sesuaikan timing di layar lirik penuh. |
+| Lirik tidak muncul | Tidak semua lagu punya lirik di LRCLIB/YTM. Coba lagu lain atau sesuaikan timing di layar lirik penuh. |
 
 ## 🔗 Tautan
 
@@ -212,4 +205,4 @@ R8/minify sengaja dimatikan, mengikuti konfigurasi proyek Sisihin yang sudah sta
 
 ---
 
-Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.2.0**.
+Dibuat dengan ☕ dan hijau `#1ED760`. Versi terbaru saat README ini ditulis: **v1.3.0**.

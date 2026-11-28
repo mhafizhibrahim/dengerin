@@ -11,7 +11,6 @@ import com.dengerin.app.core.theme.AppThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 private val Context.themeDataStore: DataStore<Preferences> by preferencesDataStore(name = "dengerin_settings")
 
@@ -21,8 +20,8 @@ class ThemePreferences(context: Context) {
     private val dataStore = context.applicationContext.themeDataStore
 
     val themeMode: Flow<AppThemeMode> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        .catch {
+            emit(emptyPreferences())
         }
         .map { prefs ->
             runCatching { AppThemeMode.valueOf(prefs[THEME_MODE_KEY] ?: AppThemeMode.SYSTEM.name) }

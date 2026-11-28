@@ -1,6 +1,9 @@
 package com.dengerin.app.data.lyrics
 
+import androidx.compose.runtime.Immutable
+
 /** Satu baris lirik dengan waktu absolut dalam milidetik. */
+@Immutable
 data class LyricLine(
     val timestampMs: Long,
     val text: String,
@@ -12,6 +15,9 @@ data class LyricLine(
  * tag metadata (`[ar:...]`, `[ti:...]`) diabaikan, dan format `mm:ss.xx` / `mm:ss:xx`.
  */
 object LrcParser {
+
+    /** Toleransi sedikit lebih awal supaya baris aktif berpindah bersama ketukan. */
+    const val ACTIVE_LEAD_MS = 150L
 
     private val timestampTag = Regex("""^(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?$""")
 
@@ -54,6 +60,25 @@ object LrcParser {
         return lines
             .distinctBy { it.timestampMs }
             .sortedBy { it.timestampMs }
+    }
+
+    /** Simpan caption YouTube CC sebagai LRC agar cache Room lama tetap dipakai. */
+    fun serialize(lines: List<LyricLine>): String = buildString {
+        lines.sortedBy { it.timestampMs }.forEach { line ->
+            val totalSeconds = line.timestampMs / 1_000L
+            val minutes = totalSeconds / 60L
+            val seconds = totalSeconds % 60L
+            val millis = line.timestampMs % 1_000L
+            append('[')
+            append(minutes)
+            append(':')
+            append(seconds.toString().padStart(2, '0'))
+            append('.')
+            append(millis.toString().padStart(3, '0'))
+            append(']')
+            append(line.text.replace('\r', ' ').replace('\n', ' '))
+            append('\n')
+        }
     }
 
     /** Indeks baris terakhir yang waktunya sudah tercapai. -1 bila belum ada. */

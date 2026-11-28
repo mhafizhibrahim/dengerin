@@ -1,6 +1,7 @@
 package com.dengerin.app.presentation.profile
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dengerin.app.data.profile.DeveloperUser
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Immutable
 data class ProfileUiState(
     val profile: UserProfile? = null,
     val isLoggedIn: Boolean = false,

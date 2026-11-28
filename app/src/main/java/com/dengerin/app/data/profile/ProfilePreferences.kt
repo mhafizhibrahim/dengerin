@@ -11,7 +11,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 private val Context.profileDataStore: DataStore<Preferences> by preferencesDataStore(name = "dengerin_profile")
 
@@ -20,8 +19,10 @@ class ProfilePreferences(context: Context) {
     private val dataStore = context.applicationContext.profileDataStore
 
     val profile: Flow<UserProfile?> = dataStore.data
-        .catch { exception ->
-            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        .catch {
+            // DataStore bisa gagal karena disk/korupsi: jangan pernah melempar ke
+            // collector (UI dan sync Firestore), cukup pakai preferensi kosong.
+            emit(emptyPreferences())
         }
         .map { prefs ->
             if (prefs[uidKey].isNullOrBlank()) null else UserProfile(

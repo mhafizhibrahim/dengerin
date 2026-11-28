@@ -2,6 +2,6 @@
 <paths>
     <!-- Hanya APK unduhan update yang dibagikan ke installer sistem. -->
     <cache-path
-        name="update_apks"
+        name="updates"
         path="updates/" />
 </paths>

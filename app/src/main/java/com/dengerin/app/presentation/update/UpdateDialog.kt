@@ -1,11 +1,8 @@
 package com.dengerin.app.presentation.update
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.text.format.Formatter
-import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -29,7 +26,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,40 +34,62 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.dengerin.app.BuildConfig
+import com.dengerin.app.R
+import com.dengerin.app.core.theme.LocalBottomClearance
 import com.dengerin.app.core.theme.LocalDengerinColors
-import com.dengerin.app.data.update.ApkDownloader
-import com.dengerin.app.data.update.UpdateChecker
+import com.dengerin.app.data.update.GitHubUpdateManager
 import kotlinx.coroutines.launch
+import java.io.File
+import java.util.Locale
+
+private sealed interface ForceUpdateState {
+    object Idle : ForceUpdateState
+    data class Downloading(
+        val percent: Int,
+        val downloadedBytes: Long,
+        val totalBytes: Long,
+    ) : ForceUpdateState
+
+    object Installing : ForceUpdateState
+    object InstallOpened : ForceUpdateState
+    data class Failed(val message: String) : ForceUpdateState
+}
 
 /**
- * Dialog pembaruan wajib: tidak bisa ditutup via Back/klik luar dan tidak ada "Nanti".
- * Dua aksi: unduh + pasang APK di aplikasi, atau buka halaman rilis GitHub.
- * Semua warna diambil dari token DESIGN_RULES.md lewat LocalDengerinColors.
+ * Dialog pembaruan wajib: tidak bisa ditutup dengan back, klik di luar, maupun tombol.
+ * Dipakai baik saat aplikasi dibuka maupun dari Pengaturan → Tentang Dengerin.
  */
 @Composable
-fun UpdateDialog(
-    release: UpdateChecker.ReleaseInfo,
-    currentVersion: String,
-    onDismiss: () -> Unit,
+fun ForceUpdateDialog(
+    release: GitHubUpdateManager.ReleaseInfo,
+    currentVersion: String = BuildConfig.VERSION_NAME,
 ) {
     val colors = LocalDengerinColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var downloading by remember { mutableStateOf(false) }
-    var downloadedBytes by remember { mutableLongStateOf(0L) }
-    var totalBytes by remember { mutableLongStateOf(-1L) }
-    var error by remember { mutableStateOf<String?>(null) }
 
-    val progress = if (totalBytes > 0) {
-        (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-    } else {
-        0f
+    var state by remember { mutableStateOf<ForceUpdateState>(ForceUpdateState.Idle) }
+    var pendingInstall by remember { mutableStateOf<File?>(null) }
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        val file = pendingInstall
+        pendingInstall = null
+        if (file != null && GitHubUpdateManager.canInstallApk(context)) {
+            GitHubUpdateManager.installApk(context, file)
+            state = ForceUpdateState.InstallOpened
+        } else if (file != null) {
+            state = ForceUpdateState.Failed("Izin instal belum diberikan. Coba lagi, ya.")
+        }
     }
 
     Dialog(
@@ -81,19 +99,31 @@ fun UpdateDialog(
             dismissOnClickOutside = false,
         ),
     ) {
+        // DialogProperties sudah mematikan back, BackHandler ini mengunci navigasi di bawahnya.
+        BackHandler(enabled = true) {}
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
                 .background(colors.surface)
                 .border(1.dp, colors.border, RoundedCornerShape(20.dp))
-                .padding(20.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
+                .padding(bottom = LocalBottomClearance.current),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(
+                painter = painterResource(R.drawable.ic_dengerin_mark),
+                contentDescription = "Logo Dengerin",
+                modifier = Modifier.size(32.dp),
+                tint = colors.accent,
+            )
+            Spacer(Modifier.height(6.dp))
+            Icon(
                 imageVector = Icons.Rounded.SystemUpdate,
-                contentDescription = "Pembaruan wajib",
-                modifier = Modifier.size(40.dp),
+                contentDescription = "Pembaruan tersedia",
+                modifier = Modifier.size(36.dp),
                 tint = colors.accent,
             )
             Spacer(Modifier.height(12.dp))
@@ -112,7 +142,7 @@ fun UpdateDialog(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "v$currentVersion → v${release.version}",
+                text = "v$currentVersion  →  v${release.version}",
                 color = colors.accentSoftContent,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
@@ -121,14 +151,30 @@ fun UpdateDialog(
                     .background(colors.accentSoftContainer)
                     .padding(horizontal = 12.dp, vertical = 4.dp),
             )
+
+            val sizeText = release.apkSizeBytes?.let { formatSize(it) } ?: "Ukuran tidak diketahui"
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Ukuran APK: $sizeText",
+                color = colors.textSecondary,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+
             Spacer(Modifier.height(12.dp))
             BoxChangelog(release.changelog)
 
-            if (downloading) {
-                Spacer(Modifier.height(16.dp))
-                if (totalBytes > 0) {
+            when (val current = state) {
+                is ForceUpdateState.Downloading -> {
+                    Spacer(Modifier.height(16.dp))
                     LinearProgressIndicator(
-                        progress = { progress },
+                        progress = {
+                            if (current.totalBytes > 0) {
+                                current.percent / 100f
+                            } else {
+                                0f
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(6.dp)
@@ -136,88 +182,122 @@ fun UpdateDialog(
                         color = colors.accent,
                         trackColor = colors.border,
                     )
-                } else {
-                    LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(50)),
-                        color = colors.accent,
-                        trackColor = colors.border,
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = buildString {
+                            append("Mengunduh...")
+                            if (current.totalBytes > 0) append(" ${current.percent}%")
+                            append(" (")
+                            append(formatSize(current.downloadedBytes))
+                            if (current.totalBytes > 0) {
+                                append(" / ${formatSize(current.totalBytes)}")
+                            }
+                            append(')')
+                        },
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
                     )
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = buildString {
-                        append("Mengunduh APK…")
-                        if (totalBytes > 0) append(" ${(progress * 100).toInt()}%")
-                        append(" · ${Formatter.formatFileSize(context, downloadedBytes)}")
-                        if (totalBytes > 0) {
-                            append(" / ${Formatter.formatFileSize(context, totalBytes)}")
-                        }
-                    },
-                    color = colors.textSecondary,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
 
-            error?.let { message ->
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = message,
-                    color = colors.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
-                )
+                is ForceUpdateState.Installing -> {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Membuka installer Android...",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                ForceUpdateState.InstallOpened -> {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Silakan konfirmasi pemasangan di layar Android.",
+                        color = colors.textSecondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+                is ForceUpdateState.Failed -> {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = current.message,
+                        color = colors.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+                ForceUpdateState.Idle -> Unit
             }
 
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = {
-                    if (downloading) return@Button
-                    error = null
-                    downloadedBytes = 0L
-                    totalBytes = -1L
-                    if (!ApkDownloader.isApkUrl(release.downloadUrl)) {
-                        error = "Asset APK tidak ditemukan di rilis ini."
+                    if (
+                        state is ForceUpdateState.Downloading ||
+                        state is ForceUpdateState.Installing ||
+                        state is ForceUpdateState.InstallOpened
+                    ) {
                         return@Button
                     }
-                    downloading = true
+                    val apkUrl = release.apkUrl
+                    if (apkUrl.isNullOrBlank()) {
+                        state = ForceUpdateState.Failed("Asset APK tidak ada di rilis ini. Gunakan Unduh via GitHub.")
+                        return@Button
+                    }
+                    state = ForceUpdateState.Downloading(0, 0L, release.apkSizeBytes ?: -1L)
                     scope.launch {
-                        try {
-                            val file = ApkDownloader.download(
-                                context = context,
-                                url = release.downloadUrl,
-                                version = release.version,
-                                onProgress = { downloaded, total ->
-                                    downloadedBytes = downloaded
-                                    totalBytes = total
-                                },
-                            )
-                            ApkDownloader.install(context, file)
-                            onDismiss()
-                        } catch (e: Exception) {
-                            error = "Unduh gagal. Cek koneksi internet, ya."
-                        } finally {
-                            downloading = false
+                        GitHubUpdateManager.downloadApkWithProgress(apkUrl).collect { download ->
+                            when (download) {
+                                is GitHubUpdateManager.DownloadState.Downloading -> {
+                                    state = ForceUpdateState.Downloading(
+                                        download.percent,
+                                        download.downloadedBytes,
+                                        download.totalBytes,
+                                    )
+                                }
+
+                                is GitHubUpdateManager.DownloadState.ReadyToInstall -> {
+                                    state = ForceUpdateState.Installing
+                                    if (GitHubUpdateManager.canInstallApk(context)) {
+                                        GitHubUpdateManager.installApk(context, download.file)
+                                        state = ForceUpdateState.InstallOpened
+                                    } else {
+                                        pendingInstall = download.file
+                                        installPermissionLauncher.launch(
+                                            GitHubUpdateManager.installPermissionIntent(context),
+                                        )
+                                    }
+                                }
+
+                                is GitHubUpdateManager.DownloadState.Failed -> {
+                                    state = ForceUpdateState.Failed(download.message)
+                                }
+                            }
                         }
                     }
                 },
-                enabled = !downloading,
+                enabled = state !is ForceUpdateState.Downloading &&
+                    state !is ForceUpdateState.Installing &&
+                    state !is ForceUpdateState.InstallOpened,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colors.accent,
-                    contentColor = colors.background,
+                    contentColor = colors.onAccent,
                     disabledContainerColor = colors.surfaceElevated,
                     disabledContentColor = colors.textSecondary,
                 ),
             ) {
                 Text(
-                    text = when {
-                        downloading -> "Mengunduh…"
-                        error != null -> "Coba Lagi"
-                        else -> "Perbarui Langsung"
+                    text = when (state) {
+                        is ForceUpdateState.Failed -> "Coba Lagi"
+                        is ForceUpdateState.Downloading -> "Mengunduh..."
+                        is ForceUpdateState.Installing -> "Memasang..."
+                        ForceUpdateState.InstallOpened -> "Menunggu Instalasi"
+                        ForceUpdateState.Idle -> "Install Langsung"
                     },
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
@@ -226,22 +306,25 @@ fun UpdateDialog(
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = {
-                    openUpdateUrl(
-                        context,
-                        release.releaseUrl.ifBlank { UpdateChecker.FALLBACK_RELEASE_URL },
-                    )
+                    GitHubUpdateManager.openReleasePage(context, release.releaseUrl)
                 },
-                enabled = !downloading,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, colors.border),
                 colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = colors.surfaceElevated,
                     contentColor = colors.textPrimary,
                     disabledContentColor = colors.textSecondary,
                 ),
             ) {
+                Icon(
+                    imageVector = Icons.Rounded.SystemUpdate,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = colors.textPrimary,
+                )
+                Spacer(Modifier.size(8.dp))
                 Text(
-                    text = "Buka di GitHub",
+                    text = "Unduh via GitHub",
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                 )
@@ -261,7 +344,8 @@ private fun BoxChangelog(changelog: String) {
             .background(colors.surfaceElevated)
             .border(1.dp, colors.border, RoundedCornerShape(12.dp))
             .verticalScroll(rememberScrollState())
-            .padding(12.dp),
+            .padding(12.dp)
+            .padding(bottom = LocalBottomClearance.current),
     ) {
         Text(
             text = changelog,
@@ -271,11 +355,12 @@ private fun BoxChangelog(changelog: String) {
     }
 }
 
-/** Buka halaman rilis di browser; fallback senyap kalau tidak ada aplikasi browser. */
-fun openUpdateUrl(context: Context, url: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-    } catch (e: ActivityNotFoundException) {
-        // Tidak ada aplikasi yang bisa membuka URL — abaikan.
+/** Format MB dengan koma desimal ala Indonesia, mis. "12,4 MB". */
+private fun formatSize(bytes: Long): String {
+    val megabytes = bytes / (1024f * 1024f)
+    return if (megabytes >= 1f) {
+        String.format(Locale("id", "ID"), "%.1f MB", megabytes)
+    } else {
+        String.format(Locale("id", "ID"), "%.0f KB", bytes / 1024f)
     }
 }

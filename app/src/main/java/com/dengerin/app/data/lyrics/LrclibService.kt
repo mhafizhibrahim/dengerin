@@ -8,6 +8,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
 /** Respons dari endpoint LRCLIB (`/api/get` dan `/api/search`). */
@@ -53,6 +54,41 @@ class LrclibService(
                 .let { results -> if (results.isEmpty()) null else pickBest(results, title, artist, duration) }
         }
 
+    /**
+     * Pencarian lirik → judul lagu. Memakai `q=` dengan timeout total 2 detik supaya
+     * fitur "Cocok dengan lirik" tidak memperlambat live search normal.
+     */
+    suspend fun searchByQuery(
+        query: String,
+        timeoutMs: Long = 2_000L,
+    ): List<LrclibTrack> = withContext(Dispatchers.IO) {
+        val encoded = URLEncoder.encode(query.trim(), "UTF-8")
+        val url = "https://lrclib.net/api/search?q=$encoded"
+        val fastClient = client.newBuilder()
+            .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+            .build()
+        val response = runCatching {
+            fastClient.newCall(
+                Request.Builder()
+                    .url(url)
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "application/json")
+                    .build(),
+            ).execute()
+        }.getOrElse { return@withContext emptyList() }
+        response.use { resp ->
+            if (!resp.isSuccessful) {
+                Log.d(TAG, "LRCLIB /search?q HTTP ${resp.code}")
+                return@use emptyList()
+            }
+            val body = resp.body?.string().orEmpty()
+            val array = runCatching { JSONArray(body) }.getOrElse { return@use emptyList() }
+            (0 until array.length()).mapNotNull { index ->
+                runCatching { array.getJSONObject(index) }.getOrNull()?.let(::parseTrack)
+            }
+        }
+    }
+
     private fun getTrack(title: String, artist: String, duration: Int): LrclibTrack? {
         val url = HttpUrl.Builder()
             .scheme("https")
@@ -63,7 +99,8 @@ class LrclibService(
             .addQueryParameter("artist_name", artist)
             .addQueryParameter("duration", duration.toString())
             .build()
-        val response = client.newCall(request(url)).execute()
+        val response = runCatching { client.newCall(request(url)).execute() }
+            .getOrElse { return null }
         return response.use { resp ->
             if (!resp.isSuccessful) {
                 if (resp.code != 404) Log.d(TAG, "LRCLIB /get HTTP ${resp.code}")
@@ -84,7 +121,8 @@ class LrclibService(
             .addQueryParameter("track_name", title)
         if (artist.isNotBlank()) builder.addQueryParameter("artist_name", artist)
 
-        val response = client.newCall(request(builder.build())).execute()
+        val response = runCatching { client.newCall(request(builder.build())).execute() }
+            .getOrElse { return emptyList() }
         return response.use { resp ->
             if (!resp.isSuccessful) {
                 Log.d(TAG, "LRCLIB /search HTTP ${resp.code}")

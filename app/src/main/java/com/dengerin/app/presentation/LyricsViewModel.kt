@@ -1,12 +1,12 @@
 package com.dengerin.app.presentation
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dengerin.app.data.lyrics.LrcParser
+import com.dengerin.app.data.lyrics.NO_LYRICS_MESSAGE
 import com.dengerin.app.data.lyrics.LyricsRepository
 import com.dengerin.app.data.model.Song
 import com.dengerin.app.player.PlayerController
-import com.dengerin.app.player.PlayerUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,39 +21,42 @@ import kotlinx.coroutines.launch
  * dari [PlayerController] yang sudah men-update tiap ~160 ms, jadi baris aktif berpindah
  * bersama ketukan tanpa perlu timer tambahan.
  */
+@Immutable
+data class LyricsPreview(
+    val hasLyrics: Boolean = false,
+    val isLoading: Boolean = false,
+)
+
 class LyricsViewModel(
     private val playerController: PlayerController,
     private val repository: LyricsRepository,
 ) : ViewModel() {
 
-    private val playerState = MutableStateFlow(PlayerUiState())
     private val mutableLyrics = MutableStateFlow(LyricsUiState())
     private var currentKey: String = ""
 
-    val uiState: StateFlow<LyricsUiState> = combine(playerState, mutableLyrics) { player, lyrics ->
-        val effectivePosition = player.positionMs + lyrics.syncOffsetMs
-        val activeIndex = if (lyrics.isSynced) {
-            LrcParser.activeIndex(lyrics.lines, effectivePosition)
-        } else {
-            -1
-        }
-        lyrics.copy(
-            song = player.song,
-            positionMs = player.positionMs,
-            durationMs = if (player.durationMs > 0) player.durationMs else player.song?.durationMs ?: 0L,
-            isPlaying = player.isPlaying,
-            activeLineIndex = activeIndex,
-        )
+    /**
+     * Hanya lagu yang diteruskan dari player. Timeline tidak ikut digabung di sini:
+     * komputasi baris aktif dipindah ke UI (`derivedStateOf`) supaya perubahan posisi
+     * tidak memicu recomposition kartu/layar lirik.
+     */
+    private val currentSong = playerController.uiState
+        .map { it.song }
+        .distinctUntilChanged(::sameSong)
+
+    val uiState: StateFlow<LyricsUiState> = combine(currentSong, mutableLyrics) { song, lyrics ->
+        lyrics.copy(song = song)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LyricsUiState())
+
+    /** Hanya dipakai NowPlaying untuk memutuskan render kartu; tidak ikut tick posisi. */
+    val preview: StateFlow<LyricsPreview> = uiState
+        .map { LyricsPreview(it.hasLyrics, it.isLoading) }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000L), LyricsPreview())
 
     init {
         viewModelScope.launch {
-            playerController.uiState.collect { playerState.value = it }
-        }
-        viewModelScope.launch {
-            playerState.map { it.song }
-                .distinctUntilChanged(::sameSong)
-                .collect { song -> loadFor(song) }
+            currentSong.collect { song -> loadFor(song) }
         }
     }
 
@@ -76,6 +79,7 @@ class LyricsViewModel(
                     lines = bundle.syncedLines,
                     plainLines = bundle.plainLines,
                     isSynced = bundle.isSynced,
+                    sourceLabel = bundle.sourceLabel,
                     isLoading = false,
                     syncOffsetMs = repository.syncOffset(currentKey),
                 )
@@ -86,7 +90,7 @@ class LyricsViewModel(
                     song = song,
                     isLoading = false,
                     error = throwable.message?.takeIf { it.isNotBlank() }
-                        ?: "Lirik belum tersedia untuk lagu ini.",
+                        ?: NO_LYRICS_MESSAGE,
                     syncOffsetMs = repository.syncOffset(currentKey),
                 )
             },
@@ -103,10 +107,10 @@ class LyricsViewModel(
 
     fun resetSyncOffset() = adjustSyncOffset(-mutableLyrics.value.syncOffsetMs)
 
+    /** Tap baris lirik = seek ke timestamp asli baris tersebut. */
     fun seekToLine(index: Int) {
-        val lyrics = mutableLyrics.value
-        val line = lyrics.lines.getOrNull(index) ?: return
-        playerController.seekTo(line.timestampMs + lyrics.syncOffsetMs)
+        val line = mutableLyrics.value.lines.getOrNull(index) ?: return
+        playerController.seekTo(line.timestampMs)
     }
 
     fun seekTo(positionMs: Long) = playerController.seekTo(positionMs)

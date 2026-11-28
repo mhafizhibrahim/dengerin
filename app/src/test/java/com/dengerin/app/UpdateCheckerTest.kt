@@ -41,6 +41,12 @@ class UpdateCheckerTest {
     }
 
     @Test
+    fun segmenKeempatIkutDibandingkan() {
+        assertTrue(UpdateChecker.isNewerVersion("1.3.0.1", "1.3.0"))
+        assertFalse(UpdateChecker.isNewerVersion("1.3.0", "1.3.0.1"))
+    }
+
+    @Test
     fun segmenKurangDianggapNol() {
         assertFalse(UpdateChecker.isNewerVersion("1.0.0", "1.0"))
         assertFalse(UpdateChecker.isNewerVersion("1.0", "1.0.0"))

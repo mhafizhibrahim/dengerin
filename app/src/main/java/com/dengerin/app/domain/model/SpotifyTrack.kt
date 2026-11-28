@@ -7,5 +7,7 @@ data class SpotifyTrack(
     val artist: String,
     val durationMs: Long,
     val thumbnailUrl: String = "",
+    /** Versi HD bila tersedia; backward-compatible dengan import lama. */
+    val coverUrl: String = "",
     val uri: String = "",
 )

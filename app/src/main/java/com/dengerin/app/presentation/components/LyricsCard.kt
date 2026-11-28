@@ -1,138 +1,169 @@
 package com.dengerin.app.presentation.components
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dengerin.app.core.theme.LocalDengerinColors
-import com.dengerin.app.data.lyrics.LyricLine
+import com.dengerin.app.data.lyrics.LrcParser
 import com.dengerin.app.presentation.LyricsUiState
+import com.dengerin.app.presentation.TimelineProviders
+import kotlinx.coroutines.flow.StateFlow
 
-/** Kartu pratinjau lirik ala Spotify, ditempatkan di bawah kontrol Now Playing. */
+/**
+ * Kartu pratinjau lirik ala Spotify. Hanya [LyricsPreviewLines] yang membaca
+ * timeline; latar kartu dan Now Playing tidak ikut recompose tiap tick posisi.
+ */
 @Composable
 fun LyricsCard(
-    state: LyricsUiState,
+    stateFlow: StateFlow<LyricsUiState>,
+    timelineProviders: TimelineProviders,
+    hasLyrics: Boolean,
     albumColor: Color,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (!hasLyrics) return
     val colors = LocalDengerinColors.current
+    val darkBase = colors.miniPlayerDark
+    val background = Brush.verticalGradient(
+        listOf(
+            mix(albumColor, darkBase, 0.48f),
+            mix(albumColor, darkBase, 0.76f),
+            darkBase,
+        ),
+    )
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(280.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.verticalGradient(
-                    listOf(albumColor, mix(albumColor, colors.background, 0.42f)),
-                ),
-            )
-            .border(1.dp, colors.border.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
-            .clickable(onClick = onOpen)
+            .clip(RoundedCornerShape(8.dp))
+            .background(background)
+            .spotifyClickable(onClick = onOpen)
             .padding(16.dp),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Lirik",
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.weight(1f))
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.16f))
-                        .clickable(onClick = onOpen),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.OpenInFull,
-                        contentDescription = "Buka lirik layar penuh",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+                Text(
+                    text = "Perluas",
+                    color = Color.White.copy(alpha = 0.68f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.spotifyClickable(onClick = onOpen),
+                )
             }
 
             Spacer(Modifier.height(14.dp))
-            when {
-                state.isLoading -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = Color.White, strokeWidth = 3.dp)
-                }
+            LyricsPreviewLines(stateFlow = stateFlow, timelineProviders = timelineProviders)
+        }
+    }
+}
 
-                state.isSynced && state.lines.isNotEmpty() -> {
-                    val start = (state.activeLineIndex - 1).coerceAtLeast(0)
-                    val end = (start + 4).coerceAtMost(state.lines.lastIndex)
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        for (index in start..end) {
-                            PreviewLine(
-                                line = state.lines[index],
-                                relative = index - state.activeLineIndex,
-                            )
-                        }
-                    }
-                }
+/** Bagian kartu yang benar-benar perlu mengikuti posisi lagu. */
+@Composable
+private fun LyricsPreviewLines(
+    stateFlow: StateFlow<LyricsUiState>,
+    timelineProviders: TimelineProviders,
+) {
+    val state by stateFlow.collectAsState()
+    val activeIndex by remember(
+        state.lines,
+        state.syncOffsetMs,
+        state.isSynced,
+        timelineProviders.position,
+    ) {
+        derivedStateOf {
+            if (state.isSynced && state.lines.isNotEmpty()) {
+                LrcParser.activeIndex(
+                    state.lines,
+                    timelineProviders.position() + state.syncOffsetMs + LrcParser.ACTIVE_LEAD_MS,
+                )
+            } else {
+                -1
+            }
+        }
+    }
+    val previewTextStyle = remember {
+        TextStyle(
+            color = Color.White,
+            fontSize = 17.sp,
+            lineHeight = 24.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Start,
+        )
+    }
 
-                state.plainLines.isNotEmpty() -> Column(
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
-                ) {
-                    state.plainLines.take(5).forEach { text ->
-                        Text(
-                            text = text,
-                            color = Color.White.copy(alpha = 0.78f),
-                            fontSize = 17.sp,
-                            lineHeight = 24.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Start,
-                        )
-                    }
+    state.sourceLabel?.takeIf { it.isNotBlank() }?.let { label ->
+        Text(
+            text = label,
+            color = Color.White.copy(alpha = 0.48f),
+            fontSize = 10.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(8.dp))
+    }
+    when {
+        state.isSynced && state.lines.isNotEmpty() -> {
+            val start = (activeIndex - 1).coerceAtLeast(0)
+            val end = (start + 3).coerceAtMost(state.lines.lastIndex)
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                for (index in start..end) {
+                    PreviewLine(
+                        text = state.lines[index].text,
+                        relative = index - activeIndex,
+                        textStyle = previewTextStyle,
+                    )
                 }
+            }
+        }
 
-                else -> Text(
-                    text = state.error ?: "Lirik belum tersedia untuk lagu ini.",
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Start,
+        state.plainLines.isNotEmpty() -> Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            state.plainLines.take(4).forEach { text ->
+                Text(
+                    text = text,
+                    color = Color.White.copy(alpha = 0.68f),
+                    style = previewTextStyle,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -140,29 +171,38 @@ fun LyricsCard(
 }
 
 @Composable
-private fun PreviewLine(line: LyricLine, relative: Int) {
-    val targetColor = when {
-        relative == 0 -> Color.White
-        relative < 0 -> Color.White.copy(alpha = 0.42f)
-        else -> Color.White.copy(alpha = 0.72f)
+private fun PreviewLine(text: String, relative: Int, textStyle: TextStyle) {
+    val targetAlpha = when {
+        relative == 0 -> 1.0f
+        relative < 0 -> 0.38f
+        else -> 0.66f
     }
-    val color by animateColorAsState(targetValue = targetColor, label = "previewLineColor")
-    val scale by animateFloatAsState(
-        targetValue = if (relative == 0) 1.02f else 1f,
+    val targetScale = if (relative == 0) 1.035f else 1.0f
+    val animatedAlpha = animateFloatAsState(
+        targetValue = targetAlpha,
+        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+        label = "previewLineAlpha",
+    )
+    val animatedScale = animateFloatAsState(
+        targetValue = targetScale,
+        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
         label = "previewLineScale",
     )
+    val annotatedText = remember(text) { AnnotatedString(text) }
+
     Text(
-        text = line.text,
-        color = color,
-        fontSize = 17.sp,
-        lineHeight = 24.sp,
-        fontWeight = if (relative == 0) FontWeight.Bold else FontWeight.Medium,
+        text = annotatedText,
+        style = textStyle,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
-        textAlign = TextAlign.Start,
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer(scaleX = scale, scaleY = scale),
+            .graphicsLayer {
+                alpha = animatedAlpha.value
+                scaleX = animatedScale.value
+                scaleY = animatedScale.value
+                transformOrigin = TransformOrigin(0f, 0.5f)
+            },
     )
 }
 

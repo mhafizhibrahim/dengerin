@@ -33,7 +33,7 @@ fun DengerinTheme(
     val context = LocalContext.current
     DisposableEffect(isDark) {
         context.findActivity()?.window?.let { window ->
-            WindowCompat.getInsetsController(window, window.decorView)?.apply {
+            WindowCompat.getInsetsController(window, window.decorView).apply {
                 isAppearanceLightStatusBars = !isDark
                 isAppearanceLightNavigationBars = !isDark
             }

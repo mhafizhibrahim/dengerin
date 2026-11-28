@@ -1,6 +1,5 @@
 package com.dengerin.app.presentation.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -45,14 +45,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.dengerin.app.R
+import com.dengerin.app.core.songListImageRequest
+import com.dengerin.app.core.theme.LocalBottomClearance
 import com.dengerin.app.core.theme.LocalDengerinColors
-import com.dengerin.app.core.upgradeThumbnailUrl
 import com.dengerin.app.data.model.Song
 import com.dengerin.app.presentation.AddToPlaylistViewModel
 
@@ -68,6 +70,7 @@ fun AddToPlaylistSheet(
 ) {
     if (song == null || viewModel == null) return
     val colors = LocalDengerinColors.current
+    val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
     var showCreateInput by remember(song.id) { mutableStateOf(false) }
     var playlistName by remember(song.id) { mutableStateOf("") }
@@ -105,11 +108,9 @@ fun AddToPlaylistSheet(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
-                    model = upgradeThumbnailUrl(song.thumbnailUrl)
-                        ?.takeIf { it.isNotBlank() }
-                        ?: R.drawable.ic_music_placeholder,
+                    model = songListImageRequest(context, song),
                     contentDescription = null,
-                    placeholder = painterResource(R.drawable.ic_music_placeholder),
+                    placeholder = darkSlatePlaceholder(),
                     error = painterResource(R.drawable.ic_music_placeholder),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -249,7 +250,10 @@ fun AddToPlaylistSheet(
             )
             Spacer(Modifier.height(8.dp))
 
-            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp),
+                contentPadding = PaddingValues(bottom = LocalBottomClearance.current),
+            ) {
                 if (state.playlists.isEmpty()) {
                     item {
                         Text(
@@ -267,7 +271,6 @@ fun AddToPlaylistSheet(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         shape = RoundedCornerShape(10.dp),
                         colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated),
-                        border = BorderStroke(1.dp, colors.border),
                         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     ) {
                         Row(

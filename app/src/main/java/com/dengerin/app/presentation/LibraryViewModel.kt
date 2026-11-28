@@ -1,5 +1,6 @@
 package com.dengerin.app.presentation
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dengerin.app.data.db.LocalPlaylistEntity
@@ -14,12 +15,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Immutable
 data class LibraryUiState(
     val liked: List<Song> = emptyList(),
     val history: List<Song> = emptyList(),
     val playlists: List<LocalPlaylistEntity> = emptyList(),
 )
 
+@Immutable
 data class LibraryActionState(
     val isBusy: Boolean = false,
     val message: String? = null,
@@ -82,14 +85,20 @@ class LibraryViewModel(
         }
     }
 
-    fun createPlaylist(name: String) {
+    fun createPlaylist(name: String, description: String = "") {
         viewModelScope.launch {
-            val id = library.createPlaylist(name)
+            val id = library.createPlaylist(name, description)
             mutableAction.update {
                 it.copy(isBusy = false, importedPlaylistId = id, message = "Playlist dibuat.")
             }
         }
     }
+
+    fun togglePin(id: String, isPinned: Boolean) {
+        viewModelScope.launch { library.setPlaylistPinned(id, isPinned) }
+    }
+
+    fun consumeNavigation() = mutableAction.update { it.copy(importedPlaylistId = null) }
 
     fun consumeAction() = mutableAction.update {
         it.copy(message = null, error = null, importedPlaylistId = null, progress = null)
